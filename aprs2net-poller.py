@@ -1,9 +1,13 @@
 #!/usr/bin/python
 
 import time
+import logging
+import logging.config
+
 import aprs2_redis
 
 pollInterval = 10
+
 
 test_setup = {
     'T2FINLAND': {
@@ -17,16 +21,23 @@ class Poller:
     aprs2.net poller
     """
     def __init__(self):
-    	self.red = aprs2_redis.APRS2Redis()
-
+        self.red = aprs2_redis.APRS2Redis()
+        
+        # read logging config file
+        logging.config.fileConfig('logging.conf')
+        logging.Formatter.converter = time.gmtime
+        
+        self.log = logging.getLogger('poller')
+        self.log.info("Starting up")
+        
     def test_load(self, set):
         """
         Load a set of servers in Redis for testing
         """
         
-        print "Loading test set:"
+        self.log.info("Loading test set...")
         for i in test_setup.keys():
-            print " ... %r" % i
+            self.log.info(" ... %r", i)
             s = test_setup[i]
             s['id'] = i
             
@@ -37,11 +48,13 @@ class Poller:
         """
         Poll a single server
         """
-        print "Polling: %s" % server['id']
+        self.log.info("Polling: %s", server['id'])
     
     def loop(self):
-        
-
+        """
+        Main polling loop
+        """
+	
         while True:
             to_poll = self.red.getPollSet()
             
