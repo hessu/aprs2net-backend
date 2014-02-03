@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 import time
-import thread
+import threading
 import logging
 import logging.config
 
@@ -70,6 +70,7 @@ class Poller:
         # thread limits
         self.threads_now = 0
         self.threads_max = 2
+        self.threads = []
         
     def test_load(self, set):
         """
@@ -84,13 +85,24 @@ class Poller:
             
             self.red.storeServer(s)
             self.red.setPollQ(i, int(time.time()))
+    
+    def perform_poll(self, server):
+    	"""
+    	Do the actual polling of a single server
+    	"""
+    	
+    	self.log.info("Poll thread started for %s", server['id'])
         
     def poll(self, server):
         """
         Poll a single server
         """
-        self.log.info("Polling: %s", server['id'])
         self.threads_now += 1
+        
+        thread = threading.Thread(target=self.perform_poll, args=(server,))
+        thread.start()
+        self.log.info("* Polling: %s - thread %d", server['id'], thread.ident)
+        self.threads.append(thread)
     
     def loop(self):
         """
@@ -110,8 +122,22 @@ class Poller:
                         self.poll(server)
                     else:
                         self.red.delPollQ(i)
-                
-            time.sleep(2)
+            
+            # reap old threads
+            threads_left = []
+            for th in self.threads:
+            	self.log.info("* checking thread %d", th.ident)
+            	if not th.is_alive():
+            	    self.log.info("* thread %d not alive any more, joining", th.ident)
+            	    th.join()
+            	    self.log.info("* thread %d joined", th.ident)
+            	    self.threads_now -= 1
+            	else:
+            	    threads_left.append(th)
+            	    
+            self.threads = threads_left
+            
+            time.sleep(1)
 
 
 poller = Poller()
