@@ -8,7 +8,7 @@ import logging.config
 import aprs2_redis
 import aprs2_poll
 
-pollInterval = 10
+pollInterval = 120
 
 
 test_setup = {
@@ -70,7 +70,7 @@ class Poller:
         
         # thread limits
         self.threads_now = 0
-        self.threads_max = 2
+        self.threads_max = 1
         self.threads = []
         
     def test_load(self, set):
@@ -115,7 +115,8 @@ class Poller:
         while True:
             if self.threads_now < self.threads_max:
                 to_poll = self.red.getPollSet()
-                self.log.info("Scheduled polls: %r", to_poll)
+                if to_poll:
+                    self.log.info("Scheduled polls: %r", to_poll)
                 
                 while to_poll and self.threads_now < self.threads_max:
                     i = to_poll.pop(0)
