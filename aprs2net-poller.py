@@ -6,6 +6,7 @@ import logging
 import logging.config
 
 import aprs2_redis
+import aprs2_poll
 
 pollInterval = 10
 
@@ -92,6 +93,9 @@ class Poller:
     	"""
     	
     	self.log.info("Poll thread started for %s", server['id'])
+    	p = aprs2_poll.Poll(self.log, server)
+    	p.poll()
+    	
         
     def poll(self, server):
         """
@@ -101,7 +105,6 @@ class Poller:
         
         thread = threading.Thread(target=self.perform_poll, args=(server,))
         thread.start()
-        self.log.info("* Polling: %s - thread %d", server['id'], thread.ident)
         self.threads.append(thread)
     
     def loop(self):
@@ -126,11 +129,11 @@ class Poller:
             # reap old threads
             threads_left = []
             for th in self.threads:
-            	self.log.info("* checking thread %d", th.ident)
+            	#self.log.debug("* checking thread %d", th.ident)
             	if not th.is_alive():
-            	    self.log.info("* thread %d not alive any more, joining", th.ident)
+            	    self.log.debug("* thread %d has finished", th.ident)
             	    th.join()
-            	    self.log.info("* thread %d joined", th.ident)
+            	    #self.log.debug("* thread %d joined", th.ident)
             	    self.threads_now -= 1
             	else:
             	    threads_left.append(th)
