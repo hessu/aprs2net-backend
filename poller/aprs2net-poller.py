@@ -10,12 +10,16 @@ import aprs2_poll
 
 pollInterval = 120
 
-
+# this is a set of servers to poll, for testing purposes, just to get us started.
 test_setup = {
     'T2FINLAND': {
         'host': 'finland',
         'ip4': '85.188.1.32',
         'ip6': '2001:67c:15c:1::32'
+    },
+    'T2BRAZIL': {
+        'host': 'brazil',
+        'ip4': '75.144.65.121'
     },
     'T2USA': {
         'host': 'northwest',
