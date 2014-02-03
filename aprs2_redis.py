@@ -52,7 +52,7 @@ class APRS2Redis:
     	
     	return self.red.zrem(kPollQueue, id)
     
-    def getPollSet(self, max=1):
+    def getPollSet(self, max=4):
     	"""
     	Get a set of servers to poll
     	"""
