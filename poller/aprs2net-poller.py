@@ -8,7 +8,7 @@ import logging.config
 import aprs2_redis
 import aprs2_poll
 
-pollInterval = 120
+pollInterval = 300
 
 # this is a set of servers to poll, for testing purposes, just to get us started.
 test_setup = {
@@ -20,11 +20,6 @@ test_setup = {
     'T2BRAZIL': {
         'host': 'brazil',
         'ip4': '75.144.65.121'
-    },
-    'T2USA': {
-        'host': 'northwest',
-        'ip4': '85.188.1.32',
-        'ip6': '2001:67c:15c:1::32'
     },
     'T2HAM': {
         'host': 'amsterdam',
@@ -74,7 +69,7 @@ class Poller:
         
         # thread limits
         self.threads_now = 0
-        self.threads_max = 1
+        self.threads_max = 4
         self.threads = []
         
     def test_load(self, set):
@@ -89,7 +84,10 @@ class Poller:
             s['id'] = i
             
             self.red.storeServer(s)
-            self.red.setPollQ(i, int(time.time()))
+            if i == 'T2BRAZIL':
+                self.red.setPollQ(i, 0)
+            else:
+                self.red.setPollQ(i, int(time.time()))
     
     def perform_poll(self, server):
     	"""
@@ -98,7 +96,28 @@ class Poller:
     	
     	self.log.info("Poll thread started for %s", server['id'])
     	p = aprs2_poll.Poll(self.log, server)
-    	p.poll()
+    	success = p.poll()
+    	props = p.properties
+    	
+    	now = int(time.time())
+    	
+    	state = self.red.getServerStatus(server['id'])
+    	if state == None:
+    	    state = {}
+    	
+    	if success == True:
+    	    state['status'] = 'ok'
+    	    state['last_ok'] = now
+    	    state['props'] = props
+    	else:
+    	    state['status'] = 'fail'
+    	    if props:
+    	        state['props'] = props
+    	    
+        state['errors'] = p.errors
+    	state['last_test'] = now
+    	
+    	self.red.setServerStatus(server['id'], state)
     	
         
     def poll(self, server):

@@ -10,6 +10,7 @@ import time
 import json
 
 kServer = 'aprs2.server'
+kServerStatus = 'aprs2.serverstat'
 kPollQueue = 'aprs2.pollq'
 
 class APRS2Redis:
@@ -17,14 +18,29 @@ class APRS2Redis:
         """
         aprs2.net status storage in Redis
         """
-        
         self.red = redis.Redis(host=host, port=port, db=0)
-        
+    
+    def setServerStatus(self, id, status):
+        """
+        Store server status
+        """
+    	return self.red.hset(kServerStatus, id, json.dumps(status))
+    
+    def getServerStatus(self, id):
+    	"""
+    	Get a single server configuration
+    	"""
+    	
+    	d = self.red.hget(kServerStatus, id)
+    	if d == None:
+    		return d
+    	
+    	return json.loads(d)
+    
     def storeServer(self, server):
     	"""
     	Store a single server configuration
     	"""
-    	
     	return self.red.hset(kServer, server['id'], json.dumps(server))
     
     def getServer(self, id):
