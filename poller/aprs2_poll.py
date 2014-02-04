@@ -347,8 +347,8 @@ class Poll:
         if not self.aprsc_get_keys(j_totals, totals_keys, 'totals'):
             return False
         
-        self.properties['total_bytes_out'] = j.get('tcp_bytes_tx', 0) + j.get('udp_bytes_tx', 0) + j.get('sctp_bytes_tx', 0)
-        self.properties['total_bytes_in'] = j.get('tcp_bytes_rx', 0) + j.get('udp_bytes_rx', 0) + j.get('sctp_bytes_rx', 0)
+        self.properties['total_bytes_out'] = j_totals.get('tcp_bytes_tx', 0) + j_totals.get('udp_bytes_tx', 0) + j_totals.get('sctp_bytes_tx', 0)
+        self.properties['total_bytes_in'] = j_totals.get('tcp_bytes_rx', 0) + j_totals.get('udp_bytes_rx', 0) + j_totals.get('sctp_bytes_rx', 0)
         
         # user load percentage
         worst_load = u_load = float(self.properties['clients']) / float(self.properties['clients_max']) * 100.0
