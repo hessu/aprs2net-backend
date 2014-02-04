@@ -50,7 +50,7 @@ class Poll:
             if r == False:
                 return False
             
-            self.log.info("%s: test %s ok", self.id, t)
+            self.log.debug("%s: HTTP %s OK %.3f s", self.id, t, self.http_status_timing)
             ok = True
             break
         
@@ -142,12 +142,47 @@ class Poll:
         Parse aprsc status JSON
         """
         
+        #
+        # server block
+        #
         j_server = j.get('server')
         if j_server == None:
             return self.error('aprsc status.json does not have a server block')
         
-        self.properties['soft'] = j_server.get('software')
-        self.properties['vers'] = j_server.get('software_version')
+        server_keys = {
+            'id': 'server_id',
+            'soft': 'software',
+            'vers': 'software_version',
+            'os': 'os'
+        }
+        
+        if not self.aprsc_get_keys(j_server, server_keys, 'server'):
+            return False
+        
+        #
+        # totals block
+        #
+        j_totals = j.get('totals')
+        if j_totals == None:
+            return self.error('aprsc status.json does not have a totals block')
+        
+        totals_keys = {
+            'clients': 'clients',
+            'tx_rate': 'bytes_tx_rate',
+            'rx_rate': 'bytes_rx_rate'
+        }
+        
+        if not self.aprsc_get_keys(j_totals, totals_keys, 'totals'):
+            return False
+        
+        return True
+        
+    def aprsc_get_keys(self, src, keys, blockid):
+        for i in keys:
+            k = keys[i]
+            v = self.properties[i] = src.get(k)
+            if v == None:
+                return self.error('aprsc status.json block "%s" does not specify "%s"' % (blockid, k))
         
         return True
 
@@ -156,5 +191,4 @@ class Poll:
         Perform APRS-IS service tests
         """
         
-        self.log.debug("%s: HTTP OK %.3f s", self.id, self.http_status_timing)
-        
+
