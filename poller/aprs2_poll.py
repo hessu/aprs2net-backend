@@ -168,6 +168,7 @@ class Poll:
         
         totals_keys = {
             'clients': 'clients',
+            'clients_max': 'clients_max',
             'tx_rate': 'bytes_tx_rate',
             'rx_rate': 'bytes_rx_rate'
         }
@@ -175,9 +176,47 @@ class Poll:
         if not self.aprsc_get_keys(j_totals, totals_keys, 'totals'):
             return False
         
+        # user load percentage
+        worst_load = u_load = float(self.properties['clients']) / float(self.properties['clients_max']) * 100.0
+        self.log.debug("server users %d/%d (%.1f %%)", self.properties['clients'], self.properties['clients_max'], u_load)
+        
+        #
+        # go through port listeners
+        #
+        j_listeners = j.get('listeners')
+        if j_listeners == None:
+            return self.error('aprsc status.json does not have a listeners block')
+        
+        for l in j_listeners:
+            addr = l.get('addr')
+            
+            proto = l.get('proto')
+            if proto == None:
+                return self.error('aprsc status.json listener does not specify protocol')
+            
+            if proto == 'udp':
+                continue
+            
+            u = l.get('clients')
+            m = l.get('clients_max')
+            if u == None or m == None:
+                return self.error('aprsc status.json listener does not specify number of clients')
+            l_load = float(u) / float(m) * 100.0
+            
+            self.log.debug("listener %r %d/%d load %.1f %%" % (addr, u, m, l_load))
+            
+            if l_load > worst_load:
+                worst_load = l_load
+        
+        self.properties['user_load'] = u_load
+        self.properties['worst_load'] = worst_load
+        
         return True
         
     def aprsc_get_keys(self, src, keys, blockid):
+        """
+        Get a set of keys from aprsc json block, with error checking
+        """
         for i in keys:
             k = keys[i]
             v = self.properties[i] = src.get(k)
