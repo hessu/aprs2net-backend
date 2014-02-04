@@ -407,23 +407,15 @@ class Poll:
         ok = True
         ok_count = 0
         
-        if 'ip4' in self.server:
-            r = t.poll(self.server['ip4'], 14580, self.id)
-            
-            if r != True:
-                self.error("IPv4 TCP 14580: %s" % r)
-                ok = False
-            else:
-                ok_count += 1
-        
-        if 'ip6' in self.server:
-            r = t.poll(self.server['ip6'], 14580, self.id)
-            
-            if r != True:
-                self.error("IPv6 TCP 14580: %s" % r)
-                ok = False
-            else:
-                ok_count += 1
+        for ac in ('ip4', 'ip6'):
+            if ac in self.server:
+                r = t.poll(self.server[ac], 14580, self.id)
+                
+                if r != True:
+                    self.error("%s TCP 14580: %s" % (ac, r))
+                    ok = False
+                else:
+                    ok_count += 1
         
         return ok and ok_count > 0
 
