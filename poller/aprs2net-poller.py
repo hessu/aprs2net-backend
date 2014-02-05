@@ -130,42 +130,60 @@ class Poller:
         thread.start()
         self.threads.append(thread)
     
+    def loop_consider_polls(self):
+        """
+        Check if there are servers to poll in the schedule,
+        start polls as necessary, while obeying the thread limit.
+        """
+        
+        to_poll = self.red.getPollSet()
+        
+        if to_poll:
+            self.log.info("Scheduled polls: %r", to_poll)
+        
+        while to_poll and self.threads_now < self.threads_max:
+            i = to_poll.pop(0)
+            server = self.red.getServer(i)
+            if server:
+                self.red.setPollQ(i, int(time.time()) + pollInterval)
+                self.poll(server)
+            else:
+                self.log.info("Server %s has been deleted, removing from queue.", i)
+                self.red.delPollQ(i)
+    
+    def loop_reap_old_threads(self):
+        """
+        Check which threads are still running.
+        """
+        
+        threads_left = []
+        
+        for th in self.threads:
+            #self.log.debug("* checking thread %d", th.ident)
+            if not th.is_alive():
+                self.log.debug("* thread %d has finished", th.ident)
+                th.join()
+                #self.log.debug("* thread %d joined", th.ident)
+                self.threads_now -= 1
+            else:
+                threads_left.append(th)
+                
+        self.threads = threads_left
+    
     def loop(self):
         """
         Main polling loop
         """
 	
         while True:
-            if self.threads_now < self.threads_max:
-                to_poll = self.red.getPollSet()
-                if to_poll:
-                    self.log.info("Scheduled polls: %r", to_poll)
-                
-                while to_poll and self.threads_now < self.threads_max:
-                    i = to_poll.pop(0)
-                    server = self.red.getServer(i)
-                    if server:
-                        self.red.setPollQ(i, int(time.time()) + pollInterval)
-                        self.poll(server)
-                    else:
-                        self.red.delPollQ(i)
-            
             # reap old threads
-            threads_left = []
-            for th in self.threads:
-            	#self.log.debug("* checking thread %d", th.ident)
-            	if not th.is_alive():
-            	    self.log.debug("* thread %d has finished", th.ident)
-            	    th.join()
-            	    #self.log.debug("* thread %d joined", th.ident)
-            	    self.threads_now -= 1
-            	else:
-            	    threads_left.append(th)
-            	    
-            self.threads = threads_left
+            self.loop_reap_old_threads()
+            
+            # start up new poll rounds, if thread limit allows
+            if self.threads_now < self.threads_max:
+                self.loop_consider_polls()
             
             time.sleep(1)
-
 
 poller = Poller()
 poller.test_load(test_setup)
