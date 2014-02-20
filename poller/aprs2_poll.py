@@ -25,9 +25,10 @@ javap3_re_num = {
 }
 
 class Poll:
-    def __init__(self, log, server):
+    def __init__(self, log, server, software_type_cache):
         self.log = log
         self.server = server
+        self.software_type_cache = software_type_cache
         self.id = server['id']
         self.status_url = 'http://%s:14501/' % self.server['ip4']
         self.rhead = {'User-agent': 'aprs2net-poller/2.0'}
@@ -57,6 +58,16 @@ class Poll:
         self.log.info("polling %s", self.id)
         self.log.debug("config: %r", self.server)
         
+        # check if we know its software type already
+        try_first = self.software_type_cache.get(self.id)
+        if try_first != None:
+            if try_first not in self.try_order:
+                self.log.info("%s: software type cache says '%s' which we don't know about", self.id, try_first)
+                del self.software_type_cache[self.id]
+            else:
+                self.try_order.remove(try_first)
+                self.try_order.insert(0, try_first)
+        
         ok = False
         for t in self.try_order:
             r = False
@@ -78,9 +89,11 @@ class Poll:
             if self.check_properties() == False:
                 return False
                 
-            self.log.debug("%s: Server users %d/%d (%.1f %%)",
-                self.id, self.properties['clients'], self.properties['clients_max'], self.properties['user_load'])
-                
+            self.log.debug("%s: Server users %d/%d (%.1f %% total, %.1f %% worst-case)",
+                self.id, self.properties['clients'], self.properties['clients_max'], self.properties['user_load'], self.properties['worst_load'])
+            
+            self.software_type_cache[self.id] = t
+            
             ok = True
             break
         
@@ -91,8 +104,8 @@ class Poll:
         if not self.service_tests():
             return False
         
-        self.properties['score'] = self.score.score()
-        self.log.info("%s: Server OK, score %.1f", self.id, self.properties['score'])
+        self.properties['score'] = self.score.get(self.properties)
+        self.log.info("%s: Server OK, score %.1f: %r", self.id, self.properties['score'], self.score.score_components)
         
         return True
     
@@ -172,6 +185,7 @@ class Poll:
             #self.log.debug("%s: got %s: %r", self.id, k, self.properties[k])
         
         self.properties['user_load'] = float(self.properties['clients']) / float(self.properties['clients_max']) * 100.0
+        self.properties['worst_load'] = self.properties['user_load']
         
         return True
     
@@ -287,6 +301,7 @@ class Poll:
         self.properties['total_bytes_out'] = int(clients_tag.find('xmtdtotals').attrib.get('bytes'))
         
         self.properties['user_load'] = float(self.properties['clients']) / float(self.properties['clients_max']) * 100.0
+        self.properties['worst_load'] = self.properties['user_load']
         
         return True
         
@@ -384,7 +399,7 @@ class Poll:
                 return self.error('aprsc status.json listener does not specify number of clients')
             l_load = float(u) / float(m) * 100.0
             
-            #self.log.debug("%s: listener %r %d/%d load %.1f %%", self.id, addr, u, m, l_load)
+            self.log.debug("%s: listener %r %d/%d load %.1f %%", self.id, addr, u, m, l_load)
             
             if l_load > worst_load:
                 worst_load = l_load

@@ -72,6 +72,9 @@ class Poller:
         self.threads_max = 4
         self.threads = []
         
+        # server software type cache
+        self.software_type_cache = {}
+        
     def test_load(self, set):
         """
         Load a set of servers in Redis for testing
@@ -95,7 +98,7 @@ class Poller:
     	"""
     	
     	self.log.info("Poll thread started for %s", server['id'])
-    	p = aprs2_poll.Poll(self.log, server)
+    	p = aprs2_poll.Poll(self.log, server, self.software_type_cache)
     	success = p.poll()
     	props = p.properties
     	
