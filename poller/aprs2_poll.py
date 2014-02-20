@@ -6,6 +6,7 @@ import re
 from lxml import etree
 
 import aprsis
+import aprs2_score
 
 # compile regular expressions to make them run faster
 javap3_re = {
@@ -34,8 +35,9 @@ class Poll:
         
         self.try_order = ['aprsc', 'javap4', 'javap3']
         
-        self.http_status_timing = None
         self.properties = {}
+        
+        self.score = aprs2_score.Score()
         
         self.errors = []
     
@@ -71,7 +73,7 @@ class Poll:
             if r == False:
                 return False
             
-            self.log.debug("%s: HTTP %s OK %.3f s", self.id, t, self.http_status_timing)
+            self.log.debug("%s: HTTP %s OK %.3f s", self.id, t, self.score.http_status_t)
             
             if self.check_properties() == False:
                 return False
@@ -86,7 +88,13 @@ class Poll:
             self.log.error("Unrecognized server: %r", self.id)
             return False
         
-        return self.service_tests()
+        if not self.service_tests():
+            return False
+        
+        self.properties['score'] = self.score.score()
+        self.log.info("%s: Server OK, score %.1f", self.id, self.properties['score'])
+        
+        return True
     
     def check_properties(self):
         """
@@ -131,7 +139,7 @@ class Poll:
             self.log.info("%s: HTML does not mention javAPRSSrvr 3 or Pete", self.id)
             return False
             
-        self.http_status_timing = t_dur
+        self.score.http_status_t = t_dur
         
         return self.parse_javaprssrvr3(d)
     
@@ -185,7 +193,7 @@ class Poll:
         d = r.content
         t_end = time.time()
         t_dur = t_end - t_start
-        self.http_status_timing = t_dur
+        self.score.http_status_t = t_dur
         
         return self.parse_javaprssrvr4(d)
     
@@ -300,7 +308,7 @@ class Poll:
         d = r.content
         t_end = time.time()
         t_dur = t_end - t_start
-        self.http_status_timing = t_dur
+        self.score.http_status_t = t_dur
         
         try:
             j = json.loads(d)
@@ -409,13 +417,16 @@ class Poll:
         
         for ac in ('ip4', 'ip6'):
             if ac in self.server:
+                t_start = time.time()
                 r = t.poll(self.server[ac], 14580, self.id)
+                t_dur = time.time() - t_start
                 
                 if r != True:
                     self.error("%s TCP 14580: %s" % (ac, r))
                     ok = False
                 else:
                     ok_count += 1
+                    self.score.poll_t_14580[ac] = t_dur
         
         return ok and ok_count > 0
 

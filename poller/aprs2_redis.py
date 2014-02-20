@@ -12,6 +12,7 @@ import json
 kServer = 'aprs2.server'
 kServerStatus = 'aprs2.serverstat'
 kPollQueue = 'aprs2.pollq'
+kScore = 'aprs2.score'
 
 class APRS2Redis:
     def __init__(self, host='localhost', port=6379):
@@ -74,6 +75,21 @@ class APRS2Redis:
     	"""
     	
     	return self.red.zrangebyscore(kPollQueue, 0, time.time(), 0, max)
+    
+    def setScore(self, id, score):
+    	"""
+    	Set the score for a server ID
+    	"""
+    	
+    	return self.red.zadd(kScore, id, pollt)
+    
+    def delScore(self, id):
+    	"""
+    	Remove a server from the scoring
+    	"""
+    	
+    	return self.red.zrem(kScore, id)
+    
     
 
 
