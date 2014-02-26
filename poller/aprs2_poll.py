@@ -136,7 +136,12 @@ class Poll:
     
         # get front page, figure out which server type it is
         t_start = time.time()
-        r = requests.get(self.status_url, headers=self.rhead, timeout=self.http_timeout)
+        try:
+            r = requests.get(self.status_url, headers=self.rhead, timeout=self.http_timeout)
+        except Exception as e:
+            self.log.info("%s: HTTP status page 14501 /: Connection error: %r", self.id, e)
+            return False
+            
         self.log.debug("%s: front %r", self.id, r.status_code)
         
         http_server = r.headers.get('server')
@@ -151,7 +156,7 @@ class Poll:
         if "javAPRSSrvr 3." not in d and "Pete Loveall AE5PL" not in d:
             self.log.info("%s: HTML does not mention javAPRSSrvr 3 or Pete", self.id)
             return False
-            
+        
         self.score.http_status_t = t_dur
         
         return self.parse_javaprssrvr3(d)
@@ -186,6 +191,7 @@ class Poll:
         
         self.properties['user_load'] = float(self.properties['clients']) / float(self.properties['clients_max']) * 100.0
         self.properties['worst_load'] = self.properties['user_load']
+        self.properties['type'] = 'javap3'
         
         return True
     
@@ -195,7 +201,12 @@ class Poll:
         """
         
         t_start = time.time()
-        r = requests.get('%s%s' % (self.status_url, 'detail.xml'), headers=self.rhead, timeout=self.http_timeout)
+        try:
+            r = requests.get('%s%s' % (self.status_url, 'detail.xml'), headers=self.rhead, timeout=self.http_timeout)
+        except Exception as e:
+            self.log.info("%s: HTTP status page 14501 /detail.xml: Connection error: %r", self.id, e)
+            return False
+            
         self.log.debug("%s: detail.xml %r", self.id, r.status_code)
         
         if r.status_code == 404:
@@ -248,6 +259,7 @@ class Poll:
         
         self.properties['soft'] = app_name
         self.properties['vers'] = app_ver
+        self.properties['type'] = 'javap4'
         
         # server id
         dup_tag = root.find('dupeprocessor')
@@ -311,7 +323,12 @@ class Poll:
         """
         
         t_start = time.time()
-        r = requests.get('%s%s' % (self.status_url, 'status.json'), headers=self.rhead, timeout=self.http_timeout)
+        try:
+            r = requests.get('%s%s' % (self.status_url, 'status.json'), headers=self.rhead, timeout=self.http_timeout)
+        except Exception as e:
+            self.log.info("%s: HTTP status page 14501 /status.json: Connection error: %r", self.id, e)
+            return False
+            
         self.log.debug("%s: status.json %r", self.id, r.status_code)
         
         if r.status_code == 404:
@@ -354,6 +371,8 @@ class Poll:
         
         if not self.aprsc_get_keys(j_server, server_keys, 'server'):
             return False
+        
+        self.properties['type'] = 'aprsc'
         
         #
         # totals block
@@ -421,10 +440,62 @@ class Poll:
         
         return True
 
+    def poll_http_submit(self):
+        """
+        Poll the HTTP submission port 8080
+        """
+        
+        # This is quite silly.
+        # We have to test that port 8080 actually responds in a way that indicates that
+        # it's a supported server which would accept position posts.
+        # But the servers don't tend to return sensible return codes unless we actually
+        # transmit a packet, and we don't want to do that. So we just do a GET and see that
+        # we get the expected error code. None of the servers return a Server: header
+        # in this case.
+        retcodes = {
+            'aprsc': 501, # Not implemented
+            'javap3': 400, # Bad request
+            'javap4': 405 # Method not allowed
+        }
+        
+        # For some reason python-requests does not accept IPv6 literal addresses in an URL.
+        # So, let's go IPv4 only for now.
+        for ac in ('ip4',):
+            if ac in self.server:
+                if ac == 'ip4':
+                    url = 'http://%s:8080/' % self.server[ac]
+                else:
+                    url = 'http://[%s]:8080/' % self.server[ac]
+                    
+                t_start = time.time()
+                try:
+                    r = requests.get(url, headers=self.rhead, timeout=self.http_timeout)
+                except Exception as e:
+                    self.log.info("%s: HTTP submit 8080: Connection error: %r", self.id, e)
+                    continue
+                    
+                self.log.debug("%s: HTTP submit 8080: %r", self.id, r.status_code)
+                t_dur = time.time() - t_start
+                
+                http_server = r.headers.get('server')
+                if http_server != None:
+                    self.log.info("%s: HTTP submit 8080: Reports Server: %r - not a HTTP submit port!", self.id, http_server)
+                    continue
+                
+                expect_code = retcodes.get(self.properties['type'])
+                if r.status_code != expect_code:
+                    self.log.info("%s: HTTP submit 8080: return code %d != expected %r - not a HTTP submit port!", self.id, r.status_code, expect_code)
+                    continue
+                
+                self.properties['submit-http-8080-' + ac] = t_dur
+                
+    
     def service_tests(self):
         """
         Perform APRS-IS service tests
         """
+        
+        self.poll_http_submit()
         
         t = aprsis.TCPPoll(self.log)
         ok = True
