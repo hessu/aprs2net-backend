@@ -11,6 +11,7 @@ import json
 
 kServer = 'aprs2.server'
 kServerStatus = 'aprs2.serverstat'
+kServerLog = 'aprs2.serverlog'
 kPollQueue = 'aprs2.pollq'
 kScore = 'aprs2.score'
 
@@ -55,6 +56,12 @@ class APRS2Redis:
     	
     	return json.loads(d)
     
+    def storeServerLog(self, id, logEntry):
+    	"""
+    	Store a single server configuration
+    	"""
+    	return self.red.hset(kServerLog, id, json.dumps(logEntry))
+    
     def setPollQ(self, id, pollt):
     	"""
     	Set the next poll time for a server ID
@@ -90,10 +97,3 @@ class APRS2Redis:
     	
     	return self.red.zrem(kScore, id)
     
-    
-
-
-
-
-
-

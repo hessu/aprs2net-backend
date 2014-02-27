@@ -18,7 +18,7 @@ class PollingLog:
         self.log = log
         self.buf = []
         self.buf_formatter = logging.Formatter(FORMAT, None)
-        
+    
     def do_append(self, level, msg, *args, **kwargs):
         """
         Format and buffer a log record.
@@ -27,6 +27,12 @@ class PollingLog:
         s = self.buf_formatter.format(record)
         self.buf.append(s)
     
+    def buffer_string(self):
+        """
+        Returns buffered log as a string.
+        """
+        return "\n".join(self.buf) + "\n"
+        
     def debug(self, msg, *args, **kwargs):
     	self.do_append(logging.DEBUG, msg, *args, **kwargs)
         self.log.debug(msg, *args, **kwargs)

@@ -69,6 +69,7 @@ class Poller:
     	state['last_test'] = now
     	
     	self.red.setServerStatus(server['id'], state)
+    	self.red.storeServerLog(server['id'], { 't': now, 'log': log.buffer_string() })
     	
         
     def poll(self, server):
