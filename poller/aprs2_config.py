@@ -1,6 +1,18 @@
 
+"""
+Config download manager. Downloads JSON server configurations from the portal
+and maintains current list of servers in the Redis database.
+
+Runs a maintenance thread, so that these operations won't block the polling
+operations, even if the portal would be down.
+"""
+
 import requests
 import json
+import threading
+import time
+
+POLL_INTERVAL = 2*60
 
 # this is a set of servers to poll, for testing purposes, just to get us started.
 test_setup = {
@@ -49,6 +61,65 @@ class ConfigManager:
     def __init__(self, log, red):
         self.log = log
         self.red = red
+        
+        self.rhead = {'User-agent': 'aprs2net-ConfigManager/2.0'}
+        self.http_timeout = 30
+        
+        self.portal_base_url = 'https://home.tomh.us:8001'
+        self.portal_servers_url = '%s/sysop/servers.json' % self.portal_base_url
+        self.portal_rotates_url = '%s/sysop/rotates.json' % self.portal_base_url
+        
+        self.shutdown = False
+        
+        self.cfg_thread = threading.Thread(target=self.cfg_loop)
+        self.cfg_thread.daemon = True
+        self.cfg_thread.start()
+        
+        self.log.info("ConfigManager initialized")
+    
+    def cfg_loop(self):
+        """
+        Main configuration thread loop.
+        """
+        
+        while not self.shutdown:
+            # Make sure the configuration manager thread does not die
+            # permanently due to a spurious error.
+            try:
+                self.refresh_config()
+            except Exception as e:
+                self.log.error("ConfigManager refresh_config crashed: %r", e)
+                
+            time.sleep(POLL_INTERVAL)
+    
+    def refresh_config(self):
+        """
+        Fetch configuration from the portal
+        """
+        self.log.info("Fetching current server list from portal...")
+        
+        t_start = time.time()
+        try:
+            r = requests.get(self.portal_servers_url, headers=self.rhead, timeout=self.http_timeout)
+            r.raise_for_status()
+        except Exception as e:
+            self.log.info("Portal: %s - Connection error: %r", self.portal_servers_url, e)
+            return False
+            
+        t_end = time.time()
+        t_dur = t_end - t_start
+        
+        if r.status_code != 200:
+            self.log.error("Portal: %s - Failed download, code: %r", self.portal_servers_url, r.status_code)
+            return False
+        
+        d = r.content
+        
+        try:
+            j = json.loads(d)
+        except Exception as e:
+            self.log.error("Portal: servers.json parsing failed: %r", e)
+            return False
         
     def test_load(self, set):
         """
