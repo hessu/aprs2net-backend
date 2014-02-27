@@ -8,6 +8,7 @@ import logging.config
 import aprs2_redis
 import aprs2_poll
 import aprs2_config
+import aprs2_logbuf
 
 pollInterval = 300
 
@@ -20,11 +21,12 @@ class Poller:
         logging.config.fileConfig('logging.conf')
         logging.Formatter.converter = time.gmtime
         
-        self.log = logging.getLogger('poller')
+        self.log = logging.getLogger('main')
         self.log.info("Starting up")
+        self.log_poller = logging.getLogger('poller')
         
         self.red = aprs2_redis.APRS2Redis()
-        self.config_manager = aprs2_config.ConfigManager(self.log, self.red)
+        self.config_manager = aprs2_config.ConfigManager(logging.getLogger('config'), self.red)
         
         # thread limits
         self.threads_now = 0
@@ -39,8 +41,12 @@ class Poller:
     	Do the actual polling of a single server
     	"""
     	
-    	self.log.info("Poll thread started for %s", server['id'])
-    	p = aprs2_poll.Poll(self.log, server, self.software_type_cache)
+    	# Use a separate log buffer for each poll, so that
+    	# we can store it in the database for easy lookup.
+    	log = aprs2_logbuf.PollingLog(self.log_poller)
+    	
+    	log.info("Poll thread started for %s", server['id'])
+    	p = aprs2_poll.Poll(log, server, self.software_type_cache)
     	success = p.poll()
     	props = p.properties
     	
@@ -72,6 +78,7 @@ class Poller:
         self.threads_now += 1
         
         thread = threading.Thread(target=self.perform_poll, args=(server,))
+        thread.daemon = True
         thread.start()
         self.threads.append(thread)
     
