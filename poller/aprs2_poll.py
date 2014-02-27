@@ -79,8 +79,11 @@ class Poll:
             if t == 'javap3':
                 r = self.poll_javaprssrvr3()
             
+            # Not this type, but might be alive?
             if r == None:
                 continue
+            
+            # Is broken?
             if r == False:
                 return False
             
@@ -94,6 +97,7 @@ class Poll:
             
             self.software_type_cache[self.id] = t
             
+            # Works, great!
             ok = True
             break
         
@@ -101,6 +105,7 @@ class Poll:
             self.log.error("Unrecognized server: %r", self.id)
             return False
         
+        # Test that the required APRS-IS services are working
         if not self.service_tests():
             return False
         
@@ -142,6 +147,9 @@ class Poll:
             self.log.info("%s: HTTP status page 14501 /: Connection error: %r", self.id, e)
             return False
             
+        t_end = time.time()
+        t_dur = t_end - t_start
+        
         self.log.debug("%s: front %r", self.id, r.status_code)
         
         http_server = r.headers.get('server')
@@ -150,8 +158,6 @@ class Poll:
             return False
         
         d = r.content
-        t_end = time.time()
-        t_dur = t_end - t_start
         
         if "javAPRSSrvr 3." not in d and "Pete Loveall AE5PL" not in d:
             self.log.info("%s: HTML does not mention javAPRSSrvr 3 or Pete", self.id)
