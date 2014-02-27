@@ -20,7 +20,7 @@ class Score:
         # It will be divided by the number of APRS-IS ports successfully polled (ipv4, ipv6: 2)
         self.aprsis_rtt_mul = 30
         
-        # poll time, in seconds (float), per address family ("ip4", "ip6")
+        # poll time, in seconds (float), per address family ("ipv4", "ipv6")
         self.poll_t_14580 = {}
         
         # http status poll time

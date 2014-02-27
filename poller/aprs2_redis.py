@@ -69,6 +69,13 @@ class APRS2Redis:
     	
     	return self.red.zadd(kPollQueue, id, pollt)
     
+    def getPollQ(self, id):
+    	"""
+    	Get the next poll time for a server ID
+    	"""
+    	
+    	return self.red.zscore(kPollQueue, id)
+    
     def delPollQ(self, id):
     	"""
     	Remove a server from the polling queue

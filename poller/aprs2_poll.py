@@ -30,7 +30,7 @@ class Poll:
         self.server = server
         self.software_type_cache = software_type_cache
         self.id = server['id']
-        self.status_url = 'http://%s:14501/' % self.server['ip4']
+        self.status_url = 'http://%s:14501/' % self.server['ipv4']
         self.rhead = {'User-agent': 'aprs2net-poller/2.0'}
         self.http_timeout = 5.0
         
@@ -143,6 +143,7 @@ class Poll:
         t_start = time.time()
         try:
             r = requests.get(self.status_url, headers=self.rhead, timeout=self.http_timeout)
+            d = r.content
         except Exception as e:
             self.log.info("%s: HTTP status page 14501 /: Connection error: %r", self.id, e)
             return False
@@ -157,7 +158,6 @@ class Poll:
             self.log.info("%s: Reports Server: %r - not javAPRSSrvr 3.x!", self.id, http_server)
             return False
         
-        d = r.content
         
         if "javAPRSSrvr 3." not in d and "Pete Loveall AE5PL" not in d:
             self.log.info("%s: HTML does not mention javAPRSSrvr 3 or Pete", self.id)
@@ -209,6 +209,7 @@ class Poll:
         t_start = time.time()
         try:
             r = requests.get('%s%s' % (self.status_url, 'detail.xml'), headers=self.rhead, timeout=self.http_timeout)
+            d = r.content
         except Exception as e:
             self.log.info("%s: HTTP status page 14501 /detail.xml: Connection error: %r", self.id, e)
             return False
@@ -221,7 +222,6 @@ class Poll:
         if r.status_code != 200:
             return False
         
-        d = r.content
         t_end = time.time()
         t_dur = t_end - t_start
         self.score.http_status_t = t_dur
@@ -331,6 +331,7 @@ class Poll:
         t_start = time.time()
         try:
             r = requests.get('%s%s' % (self.status_url, 'status.json'), headers=self.rhead, timeout=self.http_timeout)
+            d = r.content
         except Exception as e:
             self.log.info("%s: HTTP status page 14501 /status.json: Connection error: %r", self.id, e)
             return False
@@ -343,7 +344,6 @@ class Poll:
         if r.status_code != 200:
             return False
         
-        d = r.content
         t_end = time.time()
         t_dur = t_end - t_start
         self.score.http_status_t = t_dur
@@ -466,9 +466,9 @@ class Poll:
         
         # For some reason python-requests does not accept IPv6 literal addresses in an URL.
         # So, let's go IPv4 only for now.
-        for ac in ('ip4',):
+        for ac in ('ipv4',):
             if ac in self.server:
-                if ac == 'ip4':
+                if ac == 'ipv4':
                     url = 'http://%s:8080/' % self.server[ac]
                 else:
                     url = 'http://[%s]:8080/' % self.server[ac]
@@ -507,8 +507,8 @@ class Poll:
         ok = True
         ok_count = 0
         
-        for ac in ('ip4', 'ip6'):
-            if ac in self.server:
+        for ac in ('ipv4', 'ipv6'):
+            if self.server.get(ac) != None:
                 t_start = time.time()
                 r = t.poll(self.server[ac], 14580, self.id)
                 t_dur = time.time() - t_start

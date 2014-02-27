@@ -11,6 +11,7 @@ import requests
 import json
 import threading
 import time
+import random
 
 POLL_INTERVAL = 2*60
 
@@ -18,42 +19,42 @@ POLL_INTERVAL = 2*60
 test_setup = {
     'T2FINLAND': {
         'host': 'finland',
-        'ip4': '85.188.1.32',
-        'ip6': '2001:67c:15c:1::32'
+        'ipv4': '85.188.1.32',
+        'ipv6': '2001:67c:15c:1::32'
     },
     'T2BRAZIL': {
         'host': 'brazil',
-        'ip4': '75.144.65.121'
+        'ipv4': '75.144.65.121'
     },
     'T2HAM': {
         'host': 'amsterdam',
-        'ip4': '195.90.121.18',
-        'ip6': '2a01:348::4:0:34:1:1'
+        'ipv4': '195.90.121.18',
+        'ipv6': '2a01:348::4:0:34:1:1'
     },
     'T2APRSNZ': {
         'host': 'aprsnz',
-        'ip4': '125.236.199.246'
+        'ipv4': '125.236.199.246'
     },
     'T2ARK': {
         'host': 'arkansas',
-        'ip4': '67.14.192.41'
+        'ipv4': '67.14.192.41'
     },
     'T2AUSTRIA': {
         'host': 'austria',
-        'ip4': '194.208.144.169'
+        'ipv4': '194.208.144.169'
     },
     'T2BASEL': {
         'host': 'basel',
-        'ip4': '185.14.156.135',
-        'ip6': '2a03:b240:100::1'
+        'ipv4': '185.14.156.135',
+        'ipv6': '2a03:b240:100::1'
     },
     'T2BC': {
         'host': 'bc',
-        'ip4': '206.12.104.10'
+        'ipv4': '206.12.104.10'
     },
     'T2BELGIUM': {
         'host': 'belgium',
-        'ip4': '193.190.240.225'
+        'ipv4': '193.190.240.225'
     }
 }
 
@@ -121,6 +122,32 @@ class ConfigManager:
             self.log.error("Portal: servers.json parsing failed: %r", e)
             return False
         
+        return self.process_config_json(j)
+    
+    def process_config_json(self, j):
+        """
+        Process the contents of a downloaded server config JSON
+        """
+        
+        polled = {}
+        
+        for id in j:
+            c = j.get(id)
+            id = id.upper()
+            self.log.debug("%s: %r", id, c)
+            c['id'] = id
+            self.red.storeServer(c)
+            
+            if c.get('ipv4') == None:
+               self.log.info("Server has no IPv4 address: %s", id)
+               self.red.delPollQ(id)
+               continue
+            
+            polled[id] = 1
+            if self.red.getPollQ(id) == None:
+                self.log.info("Added new server: %s", id)
+                self.red.setPollQ(id, int(time.time()) + random.randint(0,20))
+        
     def test_load(self, set):
         """
         Load a set of servers in Redis for testing
@@ -136,5 +163,5 @@ class ConfigManager:
             if i == 'T2BRAZIL':
                 self.red.setPollQ(i, 0)
             else:
-                self.red.setPollQ(i, int(time.time()))
+                self.red.setPollQ(i, int(time.time()) + random.randint(0,30))
     
