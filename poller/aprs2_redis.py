@@ -83,6 +83,13 @@ class APRS2Redis:
     	
     	return self.red.zrem(kPollQueue, id)
     
+    def getPollList(self):
+        """
+        Get the full set of servers in polling queue
+        """
+        
+        return self.red.zrange(kPollQueue, 0, -1)
+    
     def getPollSet(self, max=4):
     	"""
     	Get a set of servers to poll

@@ -138,6 +138,7 @@ class ConfigManager:
             c['id'] = id
             self.red.storeServer(c)
             
+            # We do not support IPv6-only servers for now.
             if c.get('ipv4') == None:
                self.log.info("Server has no IPv4 address: %s", id)
                self.red.delPollQ(id)
@@ -147,6 +148,21 @@ class ConfigManager:
             if self.red.getPollQ(id) == None:
                 self.log.info("Added new server: %s", id)
                 self.red.setPollQ(id, int(time.time()) + random.randint(0,20))
+        
+        # TODO: add sanity check for too few servers
+        
+        self.pollq_cleanup(polled)
+    
+    def pollq_cleanup(self, polled):
+        """
+        Remove deleted servers from poll queue
+        """
+        
+        pollq = self.red.getPollList()
+        for id in pollq:
+            if not id in polled:
+                self.log.info("Removing deleted server from polling queue: %s", id)
+                self.red.delPollQ(id)
         
     def test_load(self, set):
         """
