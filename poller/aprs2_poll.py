@@ -102,7 +102,7 @@ class Poll:
             break
         
         if ok == False:
-            self.log.error("Unrecognized server: %r", self.id)
+            self.error("Server status not determined: %r" % self.id)
             return False
         
         # Test that the required APRS-IS services are working
@@ -145,8 +145,7 @@ class Poll:
             r = requests.get(self.status_url, headers=self.rhead, timeout=self.http_timeout)
             d = r.content
         except Exception as e:
-            self.log.info("%s: HTTP status page 14501 /: Connection error: %r", self.id, e)
-            return False
+            return self.error("%s: HTTP status page 14501 /: Connection error: %r" % (self.id, e))
             
         t_end = time.time()
         t_dur = t_end - t_start
@@ -157,7 +156,6 @@ class Poll:
         if http_server != None:
             self.log.info("%s: Reports Server: %r - not javAPRSSrvr 3.x!", self.id, http_server)
             return False
-        
         
         if "javAPRSSrvr 3." not in d and "Pete Loveall AE5PL" not in d:
             self.log.info("%s: HTML does not mention javAPRSSrvr 3 or Pete", self.id)
@@ -211,8 +209,7 @@ class Poll:
             r = requests.get('%s%s' % (self.status_url, 'detail.xml'), headers=self.rhead, timeout=self.http_timeout)
             d = r.content
         except Exception as e:
-            self.log.info("%s: HTTP status page 14501 /detail.xml: Connection error: %r", self.id, e)
-            return False
+            return self.error("%s: HTTP status page 14501 /detail.xml: Connection error: %r" % (self.id, e))
             
         self.log.debug("%s: detail.xml %r", self.id, r.status_code)
         
@@ -333,8 +330,7 @@ class Poll:
             r = requests.get('%s%s' % (self.status_url, 'status.json'), headers=self.rhead, timeout=self.http_timeout)
             d = r.content
         except Exception as e:
-            self.log.info("%s: HTTP status page 14501 /status.json: Connection error: %r", self.id, e)
-            return False
+            return self.error("%s: HTTP status page 14501 /status.json: Connection error: %r" % (self.id, e))
             
         self.log.debug("%s: status.json %r", self.id, r.status_code)
         
