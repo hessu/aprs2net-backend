@@ -32,6 +32,7 @@ class TCPPoll:
         s = socket.socket(af, socket.SOCK_STREAM)
         s.settimeout(self.sock_timeout)
         
+        prompt = None
         login_ok = ""
         
         try:
@@ -43,8 +44,18 @@ class TCPPoll:
             self.log.debug('%s: Login response: %s', self.id, repr(login_ok))
             s.close()
         except socket.error, msg:
+            try:
+                s.close()
+            except Exception:
+                pass
+            s = None    
             return self.error("APRS-IS socket error: %s" % msg)
         
+        s = None
+        
+        if prompt == "":
+            return self.error('Server closed connection immediately without sending version string (ACL?)')
+            
         m = re_login_ok.search(login_ok)
         if m == None:
             self.log.info('%s: Login response not recognized: %s', self.id, repr(login_ok))
