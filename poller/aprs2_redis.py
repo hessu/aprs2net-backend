@@ -14,6 +14,7 @@ kServerStatus = 'aprs2.serverstat'
 kServerLog = 'aprs2.serverlog'
 kPollQueue = 'aprs2.pollq'
 kScore = 'aprs2.score'
+kChannelStatus = 'aprs2.chStatus'
 
 class APRS2Redis:
     def __init__(self, host='localhost', port=6379):
@@ -21,6 +22,9 @@ class APRS2Redis:
         aprs2.net status storage in Redis
         """
         self.red = redis.Redis(host=host, port=port, db=0)
+    
+    def sendServerStatusMessage(self, msg):
+        self.red.publish(kChannelStatus, json.dumps(msg))
     
     def setServerStatus(self, id, status):
         """

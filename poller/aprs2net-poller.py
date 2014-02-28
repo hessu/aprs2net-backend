@@ -70,6 +70,7 @@ class Poller:
     	
     	self.red.setServerStatus(server['id'], state)
     	self.red.storeServerLog(server['id'], { 't': now, 'log': log.buffer_string() })
+    	self.red.sendServerStatusMessage({ 'config': server, 'status': state })
     	
         
     def poll(self, server):
