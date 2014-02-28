@@ -28,6 +28,11 @@ class APRS2Redis:
         """
     	return self.red.hset(kServerStatus, id, json.dumps(status))
     
+    def delServer(self, id):
+        self.red.hdel(kServer, id)
+        self.red.hdel(kServerStatus, id)
+        self.red.hdel(kServerLog, id)
+        
     def getServerStatus(self, id):
     	"""
     	Get a single server configuration
@@ -61,7 +66,7 @@ class APRS2Redis:
     	Store a single server configuration
     	"""
     	return self.red.hset(kServerLog, id, json.dumps(logEntry))
-    
+        
     def setPollQ(self, id, pollt):
     	"""
     	Set the next poll time for a server ID

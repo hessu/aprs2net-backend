@@ -163,6 +163,7 @@ class ConfigManager:
             if not id in polled:
                 self.log.info("Removing deleted server from polling queue: %s", id)
                 self.red.delPollQ(id)
+                self.red.delServer(id)
         
     def test_load(self, set):
         """
