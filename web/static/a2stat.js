@@ -99,6 +99,7 @@ function dur_str_ms(i)
 
 var evq = {};
 var servers = [];
+var servermap = {};
 
 /*
  *	give a go at using AngularJS
@@ -161,9 +162,7 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 			'params': {}
 		};
 		
-		if (evq['seq'] > 0) {
-			config['params']['seq'] = evq['seq'];
-		}
+		config['params']['seq'] = evq['seq'];
 		
 		$http.get('/api/upd', config).success(function(d) {
 			console.log('HTTP update received, status: ' + d['result']);
@@ -172,18 +171,15 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 			
 			if (d['ev']) {
 				for (var i in d['ev']) {
-					if (d['ev'][i].event == 'sqlend') {
-						for (var ei = 0; ei < ev.length; ei++)
-							if (ev[ei].id == d['ev'][i].id) {
-								ev[ei].duration = d['ev'][i].duration;
-								break;
-							}
-					} else
-						ev.unshift(d['ev'][i]);
+					var srvr = d['ev'][i];
+					var id = srvr['config']['id'];
+					console.log("  server " + id);
+					var idx = servermap[id];
+					if (idx) {
+						console.log(" ... ok, exists");
+						servers[idx] = srvr;
+					}
 				}
-				
-				if ($scope.liveModel == 'Live')
-					plotEvent(ev[0]);
 			}
 			
 			setTimeout(function() { ajax_update($scope, $http); }, 1200);
@@ -204,12 +200,17 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 			$scope.evq = evq = d['evq'];
 			var a = [];
 			var s = d['servers'];
-			$scope.servers = s;
+			servermap = {};
+			$scope.servers = servers = s;
 			
-			//setTimeout(function() { ajax_update($scope, $http); }, 1200);
+			for (var i in s) {
+				servermap[s[i]['config']['id']] = i;
+			}
+			
+			setTimeout(function() { ajax_update($scope, $http); }, 1200);
 		}).error(function(data, status, headers, config) {
 			console.log('HTTP full download failed, status: ' + status);
-			//setTimeout(function() { ajax_update($scope, $http); }, 1200);
+			setTimeout(function() { full_load($scope, $http); }, 30000);
 		});
 	};
 	
