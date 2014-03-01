@@ -104,19 +104,31 @@ function upd_response(seq, res)
 
 function handle_full_status(req, res)
 {
-	red.hgetall(kServerStatus, function (err, replies) {
-		for (i in replies) {
-			replies[i] = JSON.parse(replies[i]);
-		}
+	red.hgetall(kServerStatus, function (err, stats) {
+		for (i in stats)
+			stats[i] = JSON.parse(stats[i]);
 		
-		res.setHeader('Cache-Control', 'no-cache');
-		res.json({
-			'result': 'ok',
-			'evq': {
-				'seq': evq_seq,
-				'len': evq_len
-			},
-			'status': replies
+		red.hgetall(kServer, function (err, confs) {
+			var a = [];
+			
+			for (i in confs) {
+				if (stats[i]) {
+					a.push({
+						'config': JSON.parse(confs[i]),
+						'status': stats[i]
+					});
+				}
+			}
+			
+			res.setHeader('Cache-Control', 'no-cache');
+			res.json({
+				'result': 'ok',
+				'evq': {
+					'seq': evq_seq,
+					'len': evq_len
+				},
+				'servers': a
+			});
 		});
 	});
 	
