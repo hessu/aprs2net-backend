@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html ng-app='aprs2status'>
+<head>
+<title>aprs2.net service status poller</title>
+<meta name="lang" content="en" />
+<meta http-equiv="Content-Type" content="application/xhtml+xml;charset=UTF-8" />
+<link rel="stylesheet" type="text/css" href="http://st.pimg.net/cdn/libs/bootstrap/2.2/css/bootstrap.min.css" />
+<link rel="stylesheet" type="text/css" href="/aprs2status.css" />
+<script src="angular.min.js"></script>
+</head>
+
+<body ng-controller="a2stat">
+
+<p>event seq {{ evq.seq }} que {{ evq.len }}</p>
+
+<table class='events'>
+<tr><th>Server ID</th>
+	<th>Version</th>
+	<th>Tested</th>
+	<th>Last OK</th>
+	<th>Score</th>
+	<th>Clients</th>
+	</tr>
+<tr ng-repeat="s in servers" ng-click="rowClick(c);"
+	ng-class="{selected: s.config.id==shownServer.id, keydown: s.duration==-1}">
+	<td>{{ s.config.id }}</td>
+	<td>{{ s.status.props.soft }} {{ s.status.props.vers }}</td>
+	<td>{{ s.status.last_test | datetime }}</td>
+	<td>{{ s.status.last_ok | datetime }}</td>
+	<td>{{ s.status.props.score | number : 0 }}</td>
+	<td>{{ s.status.props.clients | number : 0 }}</td>
+	</tr>
+</table>
+
+<script type='text/JavaScript' src='jquery.min.js'></script>
+<!--[if lte IE 8]><script type='text/JavaScript' src='excanvas.min.js'></script><![endif]-->
+<script type='text/JavaScript' src='jquery.flot.min.js'></script>
+<script type='text/JavaScript' src='a2stat.js'></script>
+
+</body>
+</html>
