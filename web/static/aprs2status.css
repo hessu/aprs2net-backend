@@ -54,8 +54,12 @@ table.events tbody tr {
 	cursor: pointer;
 }
 
-table.events tbody tr.selected td {
-	background-color: #53ccff;
+table.events tbody tr.statusok td {
+	background-color: #c4d3ff;
+}
+
+table.events tbody tr.statusfail td {
+	background-color: #ff8181;
 }
 
 table.events tbody tr.keydown td {

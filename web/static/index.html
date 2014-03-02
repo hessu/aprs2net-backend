@@ -22,7 +22,7 @@
 	<th>Clients</th>
 	</tr>
 <tr ng-repeat="s in servers" ng-click="rowClick(c);"
-	ng-class="{selected: s.config.id==shownServer.id, keydown: s.duration==-1}">
+	ng-class="{statusok: s.status.status=='ok', statusfail: s.status.status=='fail', keydown: s.duration==-1}">
 	<td>{{ s.config.id }}</td>
 	<td>{{ s.status.props.soft }} {{ s.status.props.vers }}</td>
 	<td>{{ s.status.last_test | datetime }}</td>
