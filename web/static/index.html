@@ -6,7 +6,7 @@
 <meta http-equiv="Content-Type" content="application/xhtml+xml;charset=UTF-8" />
 <link rel="stylesheet" type="text/css" href="http://st.pimg.net/cdn/libs/bootstrap/2.2/css/bootstrap.min.css" />
 <link rel="stylesheet" type="text/css" href="/aprs2status.css" />
-<script src="angular.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.2.14/angular.min.js"></script>
 </head>
 
 <body ng-controller="a2stat">
@@ -14,21 +14,17 @@
 <p>event seq {{ evq.seq }} que {{ evq.len }}</p>
 
 <table class='events'>
-<tr><th>Server ID</th>
-	<th>Version</th>
-	<th>Tested</th>
-	<th>Last OK</th>
-	<th>Score</th>
-	<th>Clients</th>
-	</tr>
-<tr ng-repeat="s in servers" ng-click="rowClick(c);"
+<tr><th ng:repeat="c in columns" ng:class="selectedCls(c[0])" ng:click="changeSorting(c[0])">{{c[1]}}</th></tr>
+<tr ng-repeat="s in servers | orderBy : sort.column : sort.descending" ng-click="rowClick(c);"
 	ng-class="{statusok: s.status.status=='ok', statusfail: s.status.status=='fail', keydown: s.duration==-1}">
 	<td>{{ s.config.id }}</td>
 	<td>{{ s.status.props.soft }} {{ s.status.props.vers }}</td>
+	<td>{{ s.status.props.os }}</td>
 	<td>{{ s.status.last_test | datetime }}</td>
 	<td>{{ s.status.last_ok | datetime }}</td>
-	<td>{{ s.status.props.score | number : 0 }}</td>
 	<td>{{ s.status.props.clients | number : 0 }}</td>
+	<td>{{ s.status.props.worst_load | number : 1 }}</td>
+	<td>{{ s.status.props.score | number : 0 }}</td>
 	</tr>
 </table>
 

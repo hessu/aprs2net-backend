@@ -155,6 +155,38 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 		//plotEvent(pe);
 	}
 	
+	$scope.columns = [
+		[ 'config.id', 'Server ID' ],
+		[ 'status.props.vers', 'Version' ],
+		[ 'status.props.os', 'OS' ],
+		[ 'status.last_test', 'Tested' ],
+		[ 'status.last_ok', 'Last OK' ],
+		[ 'status.props.clients', 'Clients' ],
+		[ 'status.props.worst_load', 'C load' ],
+		[ 'status.props.score', 'Score' ]
+	];
+	
+	$scope.sort = {
+		column: 'config.id',
+		descending: false
+	};
+	
+	$scope.selectedCls = function(column) {
+		return column == $scope.sort.column && 'sort-' + $scope.sort.descending;
+	};
+	
+	$scope.changeSorting = function(column) {
+		var sort = $scope.sort;
+		console.log("sorting by " + column);
+		
+		if (sort.column == column) {
+			sort.descending = !sort.descending;
+		} else {
+			sort.column = column;
+			sort.descending = false;
+		}
+	};
+	
 	$scope.servers = servers;
 	
 	var ajax_update = function($scope, $http) {
