@@ -14,9 +14,13 @@ function timestr(i)
 		 return '';
 	
 	var D = new Date(i*1000);
-	return D.getUTCFullYear() + '-' + lz(D.getUTCMonth()+1) + '-' + lz(D.getUTCDate())
-		+ ' ' + lz(D.getUTCHours()) + ':' + lz(D.getUTCMinutes()) + ':' + lz(D.getUTCSeconds())
-		+ 'z';
+	var N = new Date();
+	
+	if (N.getTime() - D.getTime() > 86400000)
+		return D.getUTCFullYear() + '-' + lz(D.getUTCMonth()+1) + '-' + lz(D.getUTCDate());
+	else
+		return lz(D.getUTCHours()) + ':' + lz(D.getUTCMinutes()) + ':' + lz(D.getUTCSeconds()) + 'z';
+	
 }
 
 function dur_str(i)
