@@ -2,6 +2,7 @@
 body {
 	font-family: verdana, arial, helvetica, sans-serif;
 	font-size: 12px;
+	padding-top: 4px;
 }
 
 div.sprite_logo {
