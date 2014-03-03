@@ -174,8 +174,27 @@ var handle_upd = function(req, res) {
 	upd_response(seq, res);
 };
 
+var handle_slog = function(req, res) {
+	util.log("got slog req: " + JSON.stringify(req.query));
+	
+	var id = req.query['id'];
+	if (id == undefined) {
+		util.log("no server ID given");
+		res.setHeader('Cache-Control', 'no-cache');
+		res.json({ 'result': 'fail' });
+		return;
+	}
+	
+	red.hget(kServerLog, id, function (err, log) {
+		log = JSON.parse(log);
+		res.setHeader('Cache-Control', 'no-cache');
+		res.json({ 'result': 'ok', 't': log['t'], 'log': log['log'] });
+	});
+};
+
 app.get('/api/full', handle_full_status); 
 app.get('/api/upd', handle_upd); 
+app.get('/api/slog', handle_slog); 
 
 util.log("aprs2-status set up, starting listener");
 
