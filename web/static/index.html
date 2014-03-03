@@ -4,19 +4,36 @@
 <title>aprs2.net service status poller</title>
 <meta name="lang" content="en" />
 <meta http-equiv="Content-Type" content="application/xhtml+xml;charset=UTF-8" />
-<link rel="stylesheet" type="text/css" href="http://st.pimg.net/cdn/libs/bootstrap/2.2/css/bootstrap.min.css" />
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css">
 <link rel="stylesheet" type="text/css" href="/aprs2status.css" />
 <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.2.14/angular.min.js"></script>
 </head>
 
 <body ng-controller="a2stat">
 
-<p>event seq {{ evq.seq }} que {{ evq.len }}</p>
+<div class='text-muted' style='position: fixed; bottom: 5px; right: 5px;'>event seq {{ evq.seq }} que {{ evq.len }}</div>
 
-<table class='events'>
+<div><img src="tier2-small.png" /></div>
+
+<div id='popup1-content' ng-show='shownServer.config'>
+<ul class="list-group">
+<li class="list-group-item" ng:class="shownServer.status.status == 'ok' ? 'list-group-item-success' : 'list-group-item-danger'"><b>{{ shownServer.config.id }}</b>
+	<span ng:class="shownServer.status.status == 'ok' ? 'glyphicon glyphicon-ok' : 'glyphicon glyphicon-fire'"></span>
+	<span ng-show="shownServer.status.props.score"> - score {{ shownServer.status.props.score | number : 1 }}</span>
+	</li>
+<li class="list-group-item" ng-show="shownServer.status.props.scorebase">
+	Score base:
+	<span ng-repeat="(k, v) in shownServer.status.props.scorebase"> {{ k }}={{ v | number : 1 }}{{$last ? '' : ' + '}}</span></li>
+<li class="list-group-item list-group-item-danger" ng-show="shownServer.status.errors"><div ng-repeat="e in shownServer.status.errors">[{{ e[0] }}] {{ e[1] }}</div></li>
+<li class="list-group-item" ng-show="shownLog"><pre>{{ shownLog.log }}</pre></li>
+</ul>
+</div>
+
+<table class='table table-hover table-condensed'>
 <tr><th ng:repeat="c in columns" ng:class="selectedCls(c[0])" ng:click="changeSorting(c[0])">{{c[1]}}</th></tr>
-<tr ng-repeat="s in servers | orderBy : sort.column : sort.descending" ng-click="rowClick(c);"
-	ng-class="{statusok: s.status.status=='ok', statusfail: s.status.status=='fail', keydown: s.duration==-1}">
+<tr ng-repeat="s in servers | orderBy : sort.column : sort.descending" ng-click="rowClick(s);"
+	ng-class="{success: s.status.status=='ok', danger: s.status.status=='fail', keydown: s.duration==-1}">
 	<td>{{ s.config.id }}</td> 
 	<td>{{ s.status.props.soft }} {{ s.status.props.vers }}</td>
 	<td>{{ s.status.props.os }}</td>

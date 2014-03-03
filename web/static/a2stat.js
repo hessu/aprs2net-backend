@@ -152,10 +152,23 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 		console.log('changed', v);
 	});
 	*/
+	var fetchLog = function(id) {
+		var config = {
+			'params': {
+				'id': id
+			}
+		};
+		
+		$http.get('/api/slog', config).success(function(d) {
+			console.log('Log fetched for id ' + id +', status: ' + d['result']);
+			$scope.shownLog = d;
+		});
+	};
 	
-	$scope.rowClick = function(pe) {
-		//$scope.liveModel = 'Selected';
-		//plotEvent(pe);
+	$scope.rowClick = function(s) {
+		console.log("rowClick: " + s);
+		$scope.shownServer = s;
+		fetchLog(s.config.id);
 	}
 	
 	$scope.columns = [
@@ -224,6 +237,10 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 					var idx = servermap[id];
 					if (idx) {
 						servers[idx] = srvr;
+						if ($scope.shownServer && id == $scope.shownServer.config.id) {
+							console.log("  shown server, fetching log");
+							fetchLog(id);
+						}
 					} else {
 						// TODO: add new server
 					}
@@ -238,10 +255,7 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 	};
 	
 	full_load = function($scope, $http) {
-		var config = {
-			'params': {}
-		};
-		
+		var config = { 'params': { } };
 		$http.get('/api/full', config).success(function(d) {
 			console.log('HTTP full download received, status: ' + d['result']);
 			
