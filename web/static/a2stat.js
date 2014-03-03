@@ -166,7 +166,8 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 		[ 'status.last_ok', 'Last OK' ],
 		[ 'status.props.clients', 'Clients' ],
 		[ 'status.props.worst_load', 'C load' ],
-		[ 'status.props.score', 'Score' ]
+		[ 'status.props.score', 'Score' ],
+		[ 'status.props.info', 'Info' ]
 	];
 	
 	$scope.sort = {
