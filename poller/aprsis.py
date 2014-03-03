@@ -49,36 +49,36 @@ class TCPPoll:
             except Exception:
                 pass
             s = None    
-            return self.error("APRS-IS socket error: %s" % msg)
+            return self.error('IS-socket', "APRS-IS socket error: %s" % msg)
         
         s = None
         
         if prompt == "":
-            return self.error('Server closed connection immediately without sending version string (ACL?)')
+            return self.error('IS-acl', 'Server closed connection immediately without sending version string (ACL?)')
             
         m = re_login_ok.search(login_ok)
         if m == None:
             self.log.info('%s: Login response not recognized: %s', self.id, repr(login_ok))
-            return self.error("APRS-IS login response line not recognized")
+            return self.error('IS-unrecognized', "APRS-IS login response line not recognized")
         
         my_back = m.group(1)
         verif_s = m.group(2)
         serverid_back = m.group(3)
         
         if my_back != self.mycall:
-            return self.error("APRS-IS login response does not contain my callsign %s" % self.mycall)
+            return self.error('IS-login', "APRS-IS login response does not contain my callsign %s" % self.mycall)
         
         if verif_s != 'unverified':
-            return self.error("APRS-IS login response is not 'unverified' for pass -1: got '%s'" % verif_s)
+            return self.error('IS-verification', "APRS-IS login response is not 'unverified' for pass -1: got '%s'" % verif_s)
         
         if serverid_back != serverid:
-            return self.error("APRS-IS login response for '%s' has unexpected server ID: '%s'" % (serverid, serverid_back))
+            return self.error('IS-serverid', "APRS-IS login response for '%s' has unexpected server ID: '%s'" % (serverid, serverid_back))
         
         self.log.info("%s: APRS-IS TCP OK: %s port %s", self.id, host, port)
         
-        return True
+        return ['ok', 'Works fine!']
         
-    def error(self, msg):
+    def error(self, code, msg):
         self.log.info("%s: APRS-IS TCP FAIL: %s port %s: %s", self.id, self.host, self.port, msg)
-        return msg
+        return [code, msg]
 

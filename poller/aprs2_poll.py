@@ -42,13 +42,13 @@ class Poll:
         
         self.errors = []
     
-    def error(self, msg):
+    def error(self, code, msg):
         """
         Push an error to the list of errors
         """
         
-        self.log.info("%s: Polling error: %s", self.id, msg)
-        self.errors.append(msg)
+        self.log.info("%s: Polling error [%s]: %s", self.id, code, msg)
+        self.errors.append([code, msg])
         return False
     
     def poll(self):
@@ -102,7 +102,7 @@ class Poll:
             break
         
         if ok == False:
-            self.error("Server status not determined: %r" % self.id)
+            self.error('web-undetermined', "Server status not determined: %r" % self.id)
             return False
         
         # Test that the required APRS-IS services are working
@@ -127,10 +127,10 @@ class Poll:
         
         for i in mandatory:
             if self.properties.get(i) == None:
-                return self.error('Failed to get mandatory server property: "%s"' % i)
+                return self.error('web-props', 'Failed to get mandatory server property: "%s"' % i)
         
         if self.properties.get('id') != self.id:
-            return self.error('Server ID mismatch: "%s" on server, "%s" expected' % (self.properties.get('id'), self.id))
+            return self.error('id-mismatch', 'Server ID mismatch: "%s" on server, "%s" expected' % (self.properties.get('id'), self.id))
         
         return True
     
@@ -145,7 +145,7 @@ class Poll:
             r = requests.get(self.status_url, headers=self.rhead, timeout=self.http_timeout)
             d = r.content
         except Exception as e:
-            return self.error("%s: HTTP status page 14501 /: Connection error: %r" % (self.id, e))
+            return self.error('web-http-fail', "%s: HTTP status page 14501 /: Connection error: %r" % (self.id, e))
             
         t_end = time.time()
         t_dur = t_end - t_start
@@ -179,7 +179,7 @@ class Poll:
             reg = javap3_re[k]
             match = reg.search(d)
             if match == None:
-                return self.error("javAPRSSrvr 3.x status page does not have '%s'" % k)
+                return self.error('web-parse-fail', "javAPRSSrvr 3.x status page does not have '%s'" % k)
             self.properties[k] = match.group(1)
             #self.log.debug("%s: got %s: %s", self.id, k, self.properties[k])
         
@@ -187,7 +187,7 @@ class Poll:
             reg = javap3_re_num[k]
             match = reg.search(d)
             if match == None:
-                return self.error("javAPRSSrvr 3.x status page does not have numeric '%s'" % k)
+                return self.error('web-parse-fail', "javAPRSSrvr 3.x status page does not have numeric '%s'" % k)
             v = match.group(1)
             v = v.replace(',', '').replace('.', '') # has thousands separators: "78,527,080" *or* "78.527.080" !
             self.properties[k] = float(v)
@@ -209,7 +209,7 @@ class Poll:
             r = requests.get('%s%s' % (self.status_url, 'detail.xml'), headers=self.rhead, timeout=self.http_timeout)
             d = r.content
         except Exception as e:
-            return self.error("%s: HTTP status page 14501 /detail.xml: Connection error: %r" % (self.id, e))
+            return self.error('web-http-fail', "%s: HTTP status page 14501 /detail.xml: Connection error: %r" % (self.id, e))
             
         self.log.debug("%s: detail.xml %r", self.id, r.status_code)
         
@@ -238,13 +238,13 @@ class Poll:
             parser = etree.XMLParser(ns_clean=True, recover=True, encoding='utf-8')
             root = etree.fromstring(e, parser=parser)
         except Exception, exp:
-            return self.error("detail.xml XML parsing failed: %s" % str(exp))
+            return self.error('web-xml-fail', "detail.xml XML parsing failed: %s" % str(exp))
         
         if root == None or len(root) < 1:
-            return self.error("detail.xml XML parsing failed (no elements)")
+            return self.error('web-xml-fail', "detail.xml XML parsing failed (no elements)")
         
         if root.tag != 'javaprssrvr':
-            return self.error("detail.xml: root tag is not javaprssrvr")
+            return self.error('web-parse-fail', "detail.xml: root tag is not javaprssrvr")
         
         #
         # app name/ver are in the software tag
@@ -252,13 +252,13 @@ class Poll:
         
         sw_tag = root.find('software')
         if sw_tag == None:
-            return self.error("detail.xml: No 'software' tag found")
+            return self.error('web-parse-fail', "detail.xml: No 'software' tag found")
         
         app_name = sw_tag.text
         app_ver = sw_tag.attrib.get('version')
         
         if app_name == None or app_ver == None:
-            return self.error("detail.xml: Application name or version missing")
+            return self.error('web-parse-fail', "detail.xml: Application name or version missing")
         
         self.properties['soft'] = app_name
         self.properties['vers'] = app_ver
@@ -267,11 +267,11 @@ class Poll:
         # server id
         dup_tag = root.find('dupeprocessor')
         if dup_tag == None:
-            return self.error("detail.xml: No 'dupeprocessor' tag found")
+            return self.error('web-parse-fail', "detail.xml: No 'dupeprocessor' tag found")
         
         t = dup_tag.find('servercall')
         if t == None:
-            return self.error("detail.xml: No 'servercall' tag found")
+            return self.error('web-parse-fail', "detail.xml: No 'servercall' tag found")
         
         self.properties['id'] = t.text
         
@@ -281,11 +281,11 @@ class Poll:
         
         java_tag = root.find('java')
         if java_tag == None:
-            return self.error("detail.xml: No 'java' tag found")
+            return self.error('web-parse-fail', "detail.xml: No 'java' tag found")
         
         t = java_tag.find('os')
         if t == None:
-            return self.error("detail.xml: No 'os' tag found")
+            return self.error('web-parse-fail', "detail.xml: No 'os' tag found")
         
         self.properties['os'] = "%s %s" % (t.text, t.attrib.get('architecture', ''))
         
@@ -295,11 +295,11 @@ class Poll:
         
         listeners_tag = root.find('listenerports')
         if listeners_tag == None:
-            return self.error("detail.xml: No 'listenerports' tag found")
+            return self.error('web-parse-fail',"detail.xml: No 'listenerports' tag found")
         
         t = listeners_tag.find('connections')
         if t == None:
-            return self.error("detail.xml: No 'connections' tag found for 'listenerports'")
+            return self.error('web-parse-fail', "detail.xml: No 'connections' tag found for 'listenerports'")
         
         self.properties['clients'] = int(t.attrib.get('currentin'))
         self.properties['clients_max'] = int(t.attrib.get('maximum'))
@@ -310,7 +310,7 @@ class Poll:
         
         clients_tag = root.find('clients')
         if clients_tag == None:
-            return self.error("detail.xml: No 'clients' tag")
+            return self.error('web-parse-fail', "detail.xml: No 'clients' tag")
         
         self.properties['total_bytes_in'] = int(clients_tag.find('rcvdtotals').attrib.get('bytes'))
         self.properties['total_bytes_out'] = int(clients_tag.find('xmtdtotals').attrib.get('bytes'))
@@ -330,7 +330,7 @@ class Poll:
             r = requests.get('%s%s' % (self.status_url, 'status.json'), headers=self.rhead, timeout=self.http_timeout)
             d = r.content
         except Exception as e:
-            return self.error("%s: HTTP status page 14501 /status.json: Connection error: %r" % (self.id, e))
+            return self.error('web-http-fail', "%s: HTTP status page 14501 /status.json: Connection error: %r" % (self.id, e))
             
         self.log.debug("%s: status.json %r", self.id, r.status_code)
         
@@ -348,7 +348,7 @@ class Poll:
             j = json.loads(d)
         except Exception as e:
             self.log.info("%s: JSON parsing failed: %r", self.id, e)
-            return self.error('aprsc status.json JSON parsing failed')
+            return self.error('web-json-fail', 'aprsc status.json JSON parsing failed')
         
         return self.parse_aprsc(j)
         
@@ -362,7 +362,7 @@ class Poll:
         #
         j_server = j.get('server')
         if j_server == None:
-            return self.error('aprsc status.json does not have a server block')
+            return self.error('web-parse-fail', 'aprsc status.json does not have a server block')
         
         server_keys = {
             'id': 'server_id',
@@ -381,7 +381,7 @@ class Poll:
         #
         j_totals = j.get('totals')
         if j_totals == None:
-            return self.error('aprsc status.json does not have a totals block')
+            return self.error('web-parse-fail', 'aprsc status.json does not have a totals block')
         
         totals_keys = {
             'clients': 'clients',
@@ -402,14 +402,14 @@ class Poll:
         #
         j_listeners = j.get('listeners')
         if j_listeners == None:
-            return self.error('aprsc status.json does not have a listeners block')
+            return self.error('web-parse-fail', 'aprsc status.json does not have a listeners block')
         
         for l in j_listeners:
             addr = l.get('addr')
             
             proto = l.get('proto')
             if proto == None:
-                return self.error('aprsc status.json listener does not specify protocol')
+                return self.error('web-parse-fail', 'aprsc status.json listener does not specify protocol')
             
             if proto == 'udp':
                 continue
@@ -417,7 +417,7 @@ class Poll:
             u = l.get('clients')
             m = l.get('clients_max')
             if u == None or m == None:
-                return self.error('aprsc status.json listener does not specify number of clients')
+                return self.error('web-parse-fail', 'aprsc status.json listener does not specify number of clients')
             l_load = float(u) / float(m) * 100.0
             
             self.log.debug("%s: listener %r %d/%d load %.1f %%", self.id, addr, u, m, l_load)
@@ -438,7 +438,7 @@ class Poll:
             k = keys[i]
             v = self.properties[i] = src.get(k)
             if v == None:
-                return self.error('aprsc status.json block "%s" does not specify "%s"' % (blockid, k))
+                return self.error('web-parse-fail', 'aprsc status.json block "%s" does not specify "%s"' % (blockid, k))
         
         return True
 
@@ -506,11 +506,11 @@ class Poll:
         for ac in ('ipv4', 'ipv6'):
             if self.server.get(ac) != None:
                 t_start = time.time()
-                r = t.poll(self.server[ac], 14580, self.id)
+                [code, msg] = t.poll(self.server[ac], 14580, self.id)
                 t_dur = time.time() - t_start
                 
-                if r != True:
-                    self.error("%s TCP 14580: %s" % (ac, r))
+                if code != 'ok':
+                    self.error(code, "%s TCP 14580: %s" % (ac, msg))
                     ok = False
                 else:
                     ok_count += 1
