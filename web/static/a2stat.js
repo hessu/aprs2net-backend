@@ -152,6 +152,9 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 		console.log('changed', v);
 	});
 	*/
+	
+	$scope.showLog = false;
+	
 	var fetchLog = function(id) {
 		var config = {
 			'params': {

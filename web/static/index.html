@@ -20,13 +20,17 @@
 <ul class="list-group">
 <li class="list-group-item" ng:class="shownServer.status.status == 'ok' ? 'list-group-item-success' : 'list-group-item-danger'"><b>{{ shownServer.config.id }}</b>
 	<span ng:class="shownServer.status.status == 'ok' ? 'glyphicon glyphicon-ok' : 'glyphicon glyphicon-fire'"></span>
-	<span ng-show="shownServer.status.props.score"> - score {{ shownServer.status.props.score | number : 1 }}</span>
+	<span>  </span>
+	<span ng-show="shownServer.status.props.score"> <span><span class='glyphicon glyphicon-stats'></span> {{ shownServer.status.props.score | number : 1 }}</span></span>
+	<span class='pull-right'>
+		<span class='glyphicon glyphicon-list' ng:click="showLog = !showLog"></span><span class='pull-right glyphicon glyphicon-remove' ng:click="shownServer = 0"></span>
+	</span>
 	</li>
 <li class="list-group-item" ng-show="shownServer.status.props.scorebase">
 	Score base:
 	<span ng-repeat="(k, v) in shownServer.status.props.scorebase"> {{ k }}={{ v | number : 1 }}{{$last ? '' : ' + '}}</span></li>
 <li class="list-group-item list-group-item-danger" ng-show="shownServer.status.errors"><div ng-repeat="e in shownServer.status.errors">[{{ e[0] }}] {{ e[1] }}</div></li>
-<li class="list-group-item" ng-show="shownLog"><pre>{{ shownLog.log }}</pre></li>
+<li class="list-group-item" ng-show="showLog && shownLog"><pre>{{ shownLog.log }}</pre></li>
 </ul>
 </div>
 
