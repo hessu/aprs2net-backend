@@ -2,7 +2,6 @@
 body {
 	font-family: verdana, arial, helvetica, sans-serif;
 	font-size: 12px;
-	padding: 10px;
 }
 
 div.sprite_logo {
@@ -22,11 +21,8 @@ div.sprite_logo {
 		}
 }
 
-.grey { color: #666; }
 .bold { font-weight: bold; }
 .red { color: #ff5370; }
-.rxerr { color: #0000ff; cursor: pointer; }
-.rxerr_red { color: #ff5370; cursor: pointer; }
 .link { color: #0000ff; cursor: pointer; }
 /* show/hide buttons */
 .show { color: #0000ff; cursor: pointer; }

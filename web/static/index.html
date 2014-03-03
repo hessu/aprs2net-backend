@@ -14,10 +14,15 @@
 
 <div class='text-muted' style='position: fixed; bottom: 5px; right: 5px;'>event seq {{ evq.seq }} que {{ evq.len }}</div>
 
-<div class='container-fluid'>
+<div class='container'>
+
  <div class="row">
    <div class="col-md-3 col-sm-3"><div class="sprite_logo"></div></div>
-   <div class="col-md-2 col-sm-4 col-xs-6" ng-repeat="net in nets"><b>{{ net.name }} Status</b><br />123 users</div>
+   <div class="col-md-2 col-sm-4 col-xs-6" ng-repeat="net in nets">
+   	<b>{{ net.name }} Status</b><br />
+   	14/17 servers OK</br />
+   	123 users<br />
+   </div>
  </div>
 
 <div class="row" id='popup1-content' ng-show='shownServer.config'>
@@ -39,6 +44,7 @@
 </div>
 
 <div class='row'>
+<div class='table-responsive'>
 <table class='table table-hover table-condensed'>
 <tr><th ng:repeat="c in columns" ng:class="selectedCls(c[0])" ng:click="changeSorting(c[0])">{{c[1]}}</th></tr>
 <tr ng-repeat="s in servers | orderBy : sort.column : sort.descending" ng-click="rowClick(s);"
@@ -54,6 +60,7 @@
 	<td><span ng-repeat="e in s.status.errors">{{ e[0] }} </span></td>
 	</tr>
 </table>
+</div>
 </div>
 
 </div>
