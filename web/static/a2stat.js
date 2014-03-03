@@ -153,6 +153,15 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 	});
 	*/
 	
+	/* Support for service status */
+	$scope.nets = [
+		{ id: 'core', name: 'Core' },
+		{ id: 'cwop', name: 'CWOP' },
+		{ id: 't2hub', name: 'T2 Hubs' },
+		{ id: 't2leaf', name: 'T2 Leafs' }
+	];
+	
+	/* Poll log display support */
 	$scope.showLog = false;
 	
 	var fetchLog = function(id) {

@@ -32,77 +32,21 @@ div.sprite_logo {
 .show { color: #0000ff; cursor: pointer; }
 .hide { color: #0000ff; cursor: pointer; display: none; }
 
-div.page_title {
-	color: #000;
-	margin-top: 5px;
-	margin-bottom: 5px;
-	font-weight: bold;
-}
-
-
-table {
-}
-
 td {
-	background: #e1f6ff;
 	padding: 1px 4px 1px 4px;
 	margin: 1px 3px 1px 10px;
 	border: 1px solid white;
 	vertical-align: top;
 }
 
-td.grtd {
-	background: #e1f6ff; color: #0000ff; cursor: pointer;
-}
-
-td.grtd_sel {
-	background: #f6e1ff; cursor: pointer;
-}
-
 th {
 	vertical-align: top;
 }
 
-td.ar {
-	text-align: right;
+table td, table th {
+	font-size: 11px;
 }
 
-table.events tbody tr {
-	cursor: pointer;
-}
-
-table.events tbody tr.statusok td {
-	background-color: #c4d3ff;
-}
-
-table.events tbody tr.statusfail td {
-	background-color: #ff8181;
-}
-
-table.events tbody tr.keydown td {
-	background-color: #ff6c6c;
-}
-
-/* message */
-div.msg_e {
-	background-color: #f2d2d2;
-}
-
-div.msg_i {
-	background-color: #ecf581;
-}
-
-div.msg_s {
-	background-color: #c8ffc4;
-}
-
-div.msg_e, div.msg_i, div.msg_s {
-	border: thin solid #bdbdbd;
-	padding: 5px;
-	margin: 5px 25px 5px 0px;
-	border-radius: 5px;
-	width: 480px;
-}
 
 /* tooltip */
 
@@ -121,12 +65,12 @@ div.ttip {
 	display: none;
 }
 
-/* specific tables */
+/* poller log */
 
-div#dupecheck_more {
-	display: none;
-	margin-left: 20px;
+li.poll-log pre {
+	border: none;
+	padding: 0px;
+	font-size: 10px;
+	margin: 0px;
+	background: none;
 }
-
-div#motd { display: none; }
-

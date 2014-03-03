@@ -14,9 +14,13 @@
 
 <div class='text-muted' style='position: fixed; bottom: 5px; right: 5px;'>event seq {{ evq.seq }} que {{ evq.len }}</div>
 
-<div class="sprite_logo"></div>
+<div class='container-fluid'>
+ <div class="row">
+   <div class="col-md-3 col-sm-3"><div class="sprite_logo"></div></div>
+   <div class="col-md-2 col-sm-4 col-xs-6" ng-repeat="net in nets"><b>{{ net.name }} Status</b><br />123 users</div>
+ </div>
 
-<div id='popup1-content' ng-show='shownServer.config'>
+<div class="row" id='popup1-content' ng-show='shownServer.config'>
 <ul class="list-group">
 <li class="list-group-item" ng:class="shownServer.status.status == 'ok' ? 'list-group-item-success' : 'list-group-item-danger'"><b>{{ shownServer.config.id }}</b>
 	<span ng:class="shownServer.status.status == 'ok' ? 'glyphicon glyphicon-ok' : 'glyphicon glyphicon-fire'"></span>
@@ -30,10 +34,11 @@
 	Score base:
 	<span ng-repeat="(k, v) in shownServer.status.props.scorebase"> {{ k }}={{ v | number : 1 }}{{$last ? '' : ' + '}}</span></li>
 <li class="list-group-item list-group-item-danger" ng-show="shownServer.status.errors"><div ng-repeat="e in shownServer.status.errors">[{{ e[0] }}] {{ e[1] }}</div></li>
-<li class="list-group-item" ng-show="showLog && shownLog"><pre>{{ shownLog.log }}</pre></li>
+<li class="list-group-item poll-log" ng-show="showLog && shownLog"><pre>{{ shownLog.log }}</pre></li>
 </ul>
 </div>
 
+<div class='row'>
 <table class='table table-hover table-condensed'>
 <tr><th ng:repeat="c in columns" ng:class="selectedCls(c[0])" ng:click="changeSorting(c[0])">{{c[1]}}</th></tr>
 <tr ng-repeat="s in servers | orderBy : sort.column : sort.descending" ng-click="rowClick(s);"
@@ -49,6 +54,9 @@
 	<td><span ng-repeat="e in s.status.errors">{{ e[0] }} </span></td>
 	</tr>
 </table>
+</div>
+
+</div>
 
 <script type='text/JavaScript' src='jquery.min.js'></script>
 <!--[if lte IE 8]><script type='text/JavaScript' src='excanvas.min.js'></script><![endif]-->
