@@ -33,6 +33,7 @@ class Poll:
         self.status_url = 'http://%s:14501/' % self.server['ipv4']
         self.rhead = {'User-agent': 'aprs2net-poller/2.0'}
         self.http_timeout = 5.0
+        self.client_cap = 300
         
         self.try_order = ['aprsc', 'javap4', 'javap3']
         
@@ -110,6 +111,7 @@ class Poll:
             return False
         
         self.properties['score'] = self.score.get(self.properties)
+        self.properties['scorebase'] = self.score.score_components
         self.log.info("%s: Server OK, score %.1f: %r", self.id, self.properties['score'], self.score.score_components)
         
         return True
@@ -193,7 +195,7 @@ class Poll:
             self.properties[k] = float(v)
             #self.log.debug("%s: got %s: %r", self.id, k, self.properties[k])
         
-        self.properties['user_load'] = float(self.properties['clients']) / float(self.properties['clients_max']) * 100.0
+        self.properties['user_load'] = float(self.properties['clients']) / float(min(self.client_cap, self.properties['clients_max'])) * 100.0
         self.properties['worst_load'] = self.properties['user_load']
         self.properties['type'] = 'javap3'
         
@@ -315,7 +317,7 @@ class Poll:
         self.properties['total_bytes_in'] = int(clients_tag.find('rcvdtotals').attrib.get('bytes'))
         self.properties['total_bytes_out'] = int(clients_tag.find('xmtdtotals').attrib.get('bytes'))
         
-        self.properties['user_load'] = float(self.properties['clients']) / float(self.properties['clients_max']) * 100.0
+        self.properties['user_load'] = float(self.properties['clients']) / float(min(self.client_cap, self.properties['clients_max'])) * 100.0
         self.properties['worst_load'] = self.properties['user_load']
         
         return True
@@ -395,7 +397,7 @@ class Poll:
         self.properties['total_bytes_in'] = j_totals.get('tcp_bytes_rx', 0) + j_totals.get('udp_bytes_rx', 0) + j_totals.get('sctp_bytes_rx', 0)
         
         # user load percentage
-        worst_load = u_load = float(self.properties['clients']) / float(self.properties['clients_max']) * 100.0
+        worst_load = u_load = float(self.properties['clients']) / float(min(self.client_cap, self.properties['clients_max'])) * 100.0
         
         #
         # go through port listeners
@@ -418,7 +420,7 @@ class Poll:
             m = l.get('clients_max')
             if u == None or m == None:
                 return self.error('web-parse-fail', 'aprsc status.json listener does not specify number of clients')
-            l_load = float(u) / float(m) * 100.0
+            l_load = float(u) / float(min(self.client_cap, m)) * 100.0
             
             self.log.debug("%s: listener %r %d/%d load %.1f %%", self.id, addr, u, m, l_load)
             
