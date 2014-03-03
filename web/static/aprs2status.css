@@ -5,6 +5,23 @@ body {
 	padding: 10px;
 }
 
+div.sprite_logo {
+	background: url(tier2-small.png);
+	width: 185px;
+	height: 82px;
+}
+
+@media
+	only screen and (min-device-pixel-ratio: 2),
+	only screen and (-webkit-min-device-pixel-ratio: 2),
+	only screen and (-moz-min-device-pixel-ratio: 2),
+	only screen and (-o-min-device-pixel-ratio: 2/1) {
+		div.sprite_logo {
+			background: url(tier2-small@2x.png);
+			background-size: 185px 82px;
+		}
+}
+
 .grey { color: #666; }
 .bold { font-weight: bold; }
 .red { color: #ff5370; }
