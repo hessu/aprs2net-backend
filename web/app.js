@@ -138,14 +138,21 @@ var handle_upd = function(req, res) {
 	util.log("got upd req: " + JSON.stringify(req.query));
 	
 	var seq = parseInt(req.query['seq']);
-	if (!seq) {
+	if (seq == undefined) {
 		util.log("no sequence number given");
 		res.setHeader('Cache-Control', 'no-cache');
 		res.json({ 'result': 'fail' });
 		return;
 	}
-	if (seq > evq_seq)
+	if (seq > evq_seq) {
+		console.log("client seq " + seq + " > my seq " + evq_seq + " - starting from -1");
 		seq = -1;
+	} else if (evq_seq - seq > evq_len) {
+		console.log("client is too late, doing full reload");
+		res.setHeader('Cache-Control', 'no-cache');
+		res.json({ 'result': 'reload' });
+		return;
+	}
 	
 	util.log("updating with seq " + seq);
 	var seq_dif = evq_seq - seq;

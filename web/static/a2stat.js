@@ -20,7 +20,6 @@ function timestr(i)
 		return D.getUTCFullYear() + '-' + lz(D.getUTCMonth()+1) + '-' + lz(D.getUTCDate());
 	else
 		return lz(D.getUTCHours()) + ':' + lz(D.getUTCMinutes()) + ':' + lz(D.getUTCSeconds()) + 'z';
-	
 }
 
 function dur_str(i)
@@ -193,6 +192,7 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 	
 	$scope.servers = servers;
 	
+	var full_load;
 	var ajax_update = function($scope, $http) {
 		var config = {
 			'params': {}
@@ -203,6 +203,16 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 		$http.get('/api/upd', config).success(function(d) {
 			console.log('HTTP update received, status: ' + d['result']);
 			
+			if (d['result'] == 'reload') {
+				console.log('going for full reload...');
+				full_load($scope, $http);
+				return;
+			}
+			if (d['result'] != 'ok') {
+				console.log('result ' + d['result']);
+				return;
+			}
+			
 			$scope.evq = evq = d['evq'];
 			
 			if (d['ev']) {
@@ -212,8 +222,9 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 					console.log("  server " + id);
 					var idx = servermap[id];
 					if (idx) {
-						console.log(" ... ok, exists");
 						servers[idx] = srvr;
+					} else {
+						// TODO: add new server
 					}
 				}
 			}
@@ -221,11 +232,11 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 			setTimeout(function() { ajax_update($scope, $http); }, 1200);
 		}).error(function(data, status, headers, config) {
 			console.log('HTTP update failed, status: ' + status);
-			setTimeout(function() { ajax_update($scope, $http); }, 1200);
+			setTimeout(function() { ajax_update($scope, $http); }, 5000);
 		});
 	};
 	
-	var full_load = function($scope, $http) {
+	full_load = function($scope, $http) {
 		var config = {
 			'params': {}
 		};
@@ -246,7 +257,7 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 			setTimeout(function() { ajax_update($scope, $http); }, 1200);
 		}).error(function(data, status, headers, config) {
 			console.log('HTTP full download failed, status: ' + status);
-			setTimeout(function() { full_load($scope, $http); }, 30000);
+			setTimeout(function() { full_load($scope, $http); }, 10000);
 		});
 	};
 	
