@@ -101,7 +101,8 @@ class ConfigManager:
         
         t_start = time.time()
         try:
-            r = requests.get(self.portal_servers_url, headers=self.rhead, timeout=self.http_timeout)
+            # TODO: Enable CA verification again!
+            r = requests.get(self.portal_servers_url, headers=self.rhead, timeout=self.http_timeout, verify=False)
             r.raise_for_status()
         except Exception as e:
             self.log.info("Portal: %s - Connection error: %r", self.portal_servers_url, e)
