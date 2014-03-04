@@ -67,7 +67,6 @@ class ConfigManager:
         self.http_timeout = 30
         
         self.portal_base_url = portal_base_url
-        self.portal_base_url = 'https://home.tomh.us:8001'
         self.portal_servers_url = '%s/sysop/servers.json' % self.portal_base_url
         self.portal_rotates_url = '%s/sysop/rotates.json' % self.portal_base_url
         
