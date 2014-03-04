@@ -29,14 +29,14 @@ class Score:
         self.score = 0
         self.score_components = {}
     
-    def score_add(self, type, val):
+    def score_add(self, type, val, string):
         self.score += val
-        self.score_components[type] = val
+        self.score_components[type] = [ val, string ]
     
     def round_components(self):
         for i in self.score_components:
-           if self.score_components[i] > 0.0:
-               self.score_components[i] = int(self.score_components[i] * 10) / 10.0
+           if self.score_components[i][0] > 0.0:
+               self.score_components[i][0] = int(self.score_components[i][0] * 10) / 10.0
         
     def get(self, props):
         """
@@ -51,7 +51,8 @@ class Score:
         if self.http_status_t == None:
             return self.score_max
         
-        self.score_add('http_rtt', max(0, self.http_status_t - self.rtt_good_enough) * self.http_rtt_mul)
+        self.score_add('http_rtt', max(0, self.http_status_t - self.rtt_good_enough) * self.http_rtt_mul,
+        	'%.3f s' % self.http_status_t )
         
         #
         # APRS-IS
@@ -63,12 +64,16 @@ class Score:
         
         # Calculate an arithmetic average score based on 14580 RTT.
         is_score = 0
+        rtt_sum = 0
         for k in self.poll_t_14580:
             t = self.poll_t_14580.get(k, 30) # default 30 seconds, if not found (should not happen)
+            rtt_sum += self.poll_t_14580.get(k, 30)
             is_score += max(0, t - self.rtt_good_enough) * self.aprsis_rtt_mul
         
         is_score = is_score / len(self.poll_t_14580)
-        self.score_add('14580_rtt', is_score)
+        rtt_avg = rtt_sum / len(self.poll_t_14580)
+        self.score_add('14580_rtt', is_score,
+        	'%.3f s' % rtt_sum)
         
         #
         # Amount of users
@@ -78,7 +83,7 @@ class Score:
         loads = [ props.get('worst_load', 100) ]
         
         load = max(loads)
-        self.score_add('user_load', load*10.0)
+        self.score_add('user_load', load*10.0, '%.0f %%' % load)
         
         self.round_components()
         

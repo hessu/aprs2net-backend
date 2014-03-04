@@ -156,9 +156,10 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 	/* Support for service status */
 	$scope.nets = [
 		{ id: 'core', name: 'Core' },
-		{ id: 'cwop', name: 'CWOP' },
 		{ id: 't2hub', name: 'T2 Hubs' },
-		{ id: 't2leaf', name: 'T2 Leafs' }
+		{ id: 't2leaf', name: 'T2 Leafs' },
+		{ id: 'cwop', name: 'CWOP' },
+		{ id: 'fire', name: 'Firenet' }
 	];
 	
 	/* Poll log display support */
@@ -221,10 +222,9 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 	var full_load;
 	var ajax_update = function($scope, $http) {
 		var config = {
-			'params': {}
+			'timeout': 30000,
+			'params': { 'seq': evq['seq'] }
 		};
-		
-		config['params']['seq'] = evq['seq'];
 		
 		$http.get('/api/upd', config).success(function(d) {
 			console.log('HTTP update received, status: ' + d['result']);
