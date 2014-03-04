@@ -553,14 +553,18 @@ class Poll:
         ok = True
         ok_count = 0
         
+        port = 14580
+        if self.id.startswith('T2HUB'):
+            port = 20152
+        
         for ac in ('ipv4', 'ipv6'):
             if self.server.get(ac) != None:
                 t_start = time.time()
-                [code, msg] = t.poll(self.server[ac], 14580, self.id)
+                [code, msg] = t.poll(self.server[ac], port, self.id)
                 t_dur = time.time() - t_start
                 
                 if code != 'ok':
-                    self.error(code, "%s TCP 14580: %s" % (ac, msg))
+                    self.error(code, "%s TCP %d: %s" % (ac, port, msg))
                     ok = False
                 else:
                     ok_count += 1

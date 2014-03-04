@@ -95,7 +95,7 @@ class Score:
         
         is_score = is_score / len(self.poll_t_14580)
         rtt_avg = rtt_sum / len(self.poll_t_14580)
-        self.score_add('14580_rtt', is_score,
+        self.score_add('aprsis_rtt', is_score,
         	'%.3f s' % rtt_sum)
         
         #
@@ -128,9 +128,4 @@ class Score:
                 self.score_add('uptime', penalty, uptime_s)
         
         return self.score
-        
 
-
-        
-        
-    
