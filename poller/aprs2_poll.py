@@ -14,15 +14,18 @@ javap3_re = {
     'os': re.compile('<TD[^>]*>OS</TD><TD>([^>]+)</TD>'),
     'soft': re.compile('<TH[^>]*>(javAPRSSrvr) \\d+.\\d+[^>]+<BR>'),
     'vers': re.compile('<TH[^>]*>javAPRSSrvr (\\d+.\\d+[^>]+)<BR>'),
+    'uptime': re.compile('<TD[^>]*>Total Up Time</TD><TD>([^>]+)</TD></TR>'),
 }
 
 javap3_re_num = {
-    # depending on server's system locale these integers have thousands separators, or not, either '.' or ','
+    # depending on server's system locale these integers have thousands separators, or not, either '.' or ',', "'"
     'clients': re.compile('<TD[^>]*>Current Inbound Connections</TD><TD>([\\d,\\.]+)</TD>'),
     'clients_max': re.compile('<TD[^>]*>Maximum Inbound Connections</TD><TD>([\\d,\\.]+)</TD>'),
-    'total_bytes_in': re.compile('<TD[^>]*>Total Bytes In</TD><TD>([\\d,\\.]+)</TD>'),
-    'total_bytes_out': re.compile('<TD[^>]*>Total Bytes Out</TD><TD>([\\d,\\.]+)</TD>'),
+    'total_bytes_in': re.compile('<TD[^>]*>Total Bytes In</TD><TD>([\\d,\\.\']+)</TD>'),
+    'total_bytes_out': re.compile('<TD[^>]*>Total Bytes Out</TD><TD>([\\d,\\.\']+)</TD>'),
 }
+
+javap3_re_uptime = re.compile('(\\d+)(\\.\d+){0,1}([dhms])(.*)')
 
 class Poll:
     def __init__(self, log, server, software_type_cache):
@@ -35,7 +38,7 @@ class Poll:
         self.http_timeout = 5.0
         self.client_cap = 300
         
-        self.try_order = ['aprsc', 'javap4', 'javap3']
+        self.try_order = ['javap3', 'aprsc', 'javap4']
         
         self.properties = {}
         
@@ -136,6 +139,36 @@ class Poll:
         
         return True
     
+    def javap3_decode_uptime(self, s):
+    	"""
+    	Decode javaprssrvr3 uptime string
+    	"""
+    	self.log.debug("javap3 uptime: %s", s)
+    	# 132d18h34m27.215s
+    	
+        mul = {
+            'd': 86400,
+            'h': 3600,
+            'm': 60,
+            's': 1
+        }
+        
+        up = 0
+    	while True and s != '':
+    	    match = javap3_re_uptime.match(s)
+    	    if match == None:
+    	        break;
+    	    #self.log.debug("  found: %s %s", match.group(1), match.group(3))
+    	    
+    	    m = mul.get(match.group(3))
+    	    if m != None:
+    	        up += int(match.group(1)) * m	
+    	    
+    	    s = match.group(4)
+    	    #self.log.debug("  left: %s", s)
+    	
+    	return up
+    
     def poll_javaprssrvr3(self):
         """
         Poll javAPRSSrvr 3.x
@@ -147,17 +180,17 @@ class Poll:
             r = requests.get(self.status_url, headers=self.rhead, timeout=self.http_timeout)
             d = r.content
         except Exception as e:
-            return self.error('web-http-fail', "%s: HTTP status page 14501 /: Connection error: %r" % (self.id, e))
+            return self.error('web-http-fail', "%s: HTTP status page 14501 /: Connection error: %s" % (self.id, str(e)))
             
         t_end = time.time()
         t_dur = t_end - t_start
         
-        self.log.debug("%s: front %r", self.id, r.status_code)
+        self.log.debug("%s: HTTP GET / returned: %r", self.id, r.status_code)
         
         http_server = r.headers.get('server')
         if http_server != None:
-            self.log.info("%s: Reports Server: %r - not javAPRSSrvr 3.x!", self.id, http_server)
-            return False
+            self.log.info("%s: Reports Server: %r - not javAPRSSrvr 3.x", self.id, http_server)
+            return None
         
         if "javAPRSSrvr 3." not in d and "Pete Loveall AE5PL" not in d:
             self.log.info("%s: HTML does not mention javAPRSSrvr 3 or Pete", self.id)
@@ -191,10 +224,13 @@ class Poll:
             if match == None:
                 return self.error('web-parse-fail', "javAPRSSrvr 3.x status page does not have numeric '%s'" % k)
             v = match.group(1)
-            v = v.replace(',', '').replace('.', '') # has thousands separators: "78,527,080" *or* "78.527.080" !
+            # javaprssrvr uses thousands separators based on current locale at server:
+            # "78,527,080" *or* "78.527.080" or "78'527'080" !
+            v = v.replace(',', '').replace('.', '').replace("'", '')
             self.properties[k] = float(v)
             #self.log.debug("%s: got %s: %r", self.id, k, self.properties[k])
         
+        self.properties['uptime'] = self.javap3_decode_uptime(self.properties['uptime'])
         self.properties['user_load'] = float(self.properties['clients']) / float(min(self.client_cap, self.properties['clients_max'])) * 100.0
         self.properties['worst_load'] = self.properties['user_load']
         self.properties['type'] = 'javap3'
@@ -211,13 +247,14 @@ class Poll:
             r = requests.get('%s%s' % (self.status_url, 'detail.xml'), headers=self.rhead, timeout=self.http_timeout)
             d = r.content
         except Exception as e:
-            return self.error('web-http-fail', "%s: HTTP status page 14501 /detail.xml: Connection error: %r" % (self.id, e))
+            return self.error('web-http-fail', "%s: HTTP status page 14501 /detail.xml: Connection error: %s" % (self.id, str(e)))
             
-        self.log.debug("%s: detail.xml %r", self.id, r.status_code)
-        
         if r.status_code == 404:
+            self.log.info("%s: detail.xml 404 Not Found - not javAPRSSrvr 4", self.id)
             return None
             
+        self.log.debug("%s: HTTP GET /detail.xml returned: %r", self.id, r.status_code)
+        
         if r.status_code != 200:
             return False
         
@@ -291,6 +328,16 @@ class Poll:
         
         self.properties['os'] = "%s %s" % (t.text, t.attrib.get('architecture', ''))
         
+        time_tag = java_tag.find('time')
+        if time_tag == None:
+            return self.error('web-parse-fail', "detail.xml: No 'time' tag found")
+            
+        t = time_tag.find('up')
+        if t == None:
+            return self.error('web-parse-fail', "detail.xml: No 'up' uptime tag found")
+        
+        self.properties['uptime'] = int(t.attrib.get('millis', 0)) / 1000
+        
         #
         # listener ports
         #
@@ -332,9 +379,9 @@ class Poll:
             r = requests.get('%s%s' % (self.status_url, 'status.json'), headers=self.rhead, timeout=self.http_timeout)
             d = r.content
         except Exception as e:
-            return self.error('web-http-fail', "%s: HTTP status page 14501 /status.json: Connection error: %r" % (self.id, e))
+            return self.error('web-http-fail', "%s: HTTP status page 14501 /status.json: Connection error: %s" % (self.id, str(e)))
             
-        self.log.debug("%s: status.json %r", self.id, r.status_code)
+        self.log.debug("%s: HTTP GET /status.json returned: %r", self.id, r.status_code)
         
         if r.status_code == 404:
             return None
@@ -370,7 +417,8 @@ class Poll:
             'id': 'server_id',
             'soft': 'software',
             'vers': 'software_version',
-            'os': 'os'
+            'os': 'os',
+            'uptime': 'uptime'
         }
         
         if not self.aprsc_get_keys(j_server, server_keys, 'server'):
@@ -478,7 +526,6 @@ class Poll:
                     self.log.info("%s: HTTP submit 8080: Connection error: %r", self.id, e)
                     continue
                     
-                self.log.debug("%s: HTTP submit 8080: %r", self.id, r.status_code)
                 t_dur = time.time() - t_start
                 
                 http_server = r.headers.get('server')
@@ -491,6 +538,7 @@ class Poll:
                     self.log.info("%s: HTTP submit 8080: return code %d != expected %r - not a HTTP submit port!", self.id, r.status_code, expect_code)
                     continue
                 
+                self.log.info("%s: HTTP submit 8080: return code %r - OK, looks like a submit port (%.3f s)", self.id, r.status_code, t_dur)
                 self.properties['submit-http-8080-' + ac] = t_dur
                 
     
