@@ -137,15 +137,17 @@ class ConfigManager:
             id = id.upper()
             self.log.debug("%s: %r", id, c)
             c['id'] = id
-            self.red.storeServer(c)
             
             # We do not support IPv6-only servers for now.
             if c.get('ipv4') == None:
                self.log.info("Server has no IPv4 address: %s", id)
                self.red.delPollQ(id)
+               self.red.delServer(id)
                continue
             
+            self.red.storeServer(c)
             polled[id] = 1
+            
             if self.red.getPollQ(id) == None:
                 self.log.info("Added new server: %s", id)
                 self.red.setPollQ(id, int(time.time()) + random.randint(0,20))
