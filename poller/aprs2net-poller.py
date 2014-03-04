@@ -4,6 +4,7 @@ import time
 import threading
 import logging
 import logging.config
+import ConfigParser
 import sys
 import traceback
 
@@ -14,19 +15,36 @@ import aprs2_logbuf
 
 pollInterval = 300
 
+# All configuration variables need to be strings originally.
+CONFIG_SECTION = 'poller'
+DEFAULT_CONF = {
+    # Server polling interval
+    'poll_interval': '300'
+}
+
 class Poller:
     """
     aprs2.net poller
     """
-    def __init__(self):
+    def __init__(self, config_file='poller.conf'):
         # read logging config file
-        logging.config.fileConfig('logging.conf')
+        logging.config.fileConfig(config_file)
         logging.Formatter.converter = time.gmtime
         
         self.log = logging.getLogger('main')
         self.log.info("Starting up")
         self.log_poller = logging.getLogger('poller')
         
+        # read configuration
+        self.config = ConfigParser.ConfigParser()
+        self.config.add_section(CONFIG_SECTION)
+        
+        for option, value in DEFAULT_CONF.iteritems():
+            self.config.set(CONFIG_SECTION, option, value)
+            
+        self.config.read(config_file)
+        
+        # redis client                                            
         self.red = aprs2_redis.APRS2Redis()
         self.config_manager = aprs2_config.ConfigManager(logging.getLogger('config'), self.red)
         
