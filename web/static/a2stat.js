@@ -250,6 +250,7 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 					if (idx) {
 						servers[idx] = srvr;
 						if ($scope.shownServer && id == $scope.shownServer.config.id) {
+							$scope.shownServer = srvr;
 							console.log("  shown server, fetching log");
 							fetchLog(id);
 						}
