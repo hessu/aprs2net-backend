@@ -39,15 +39,15 @@ class Poller:
         self.software_type_cache = {}
         
     def perform_poll(self, server):
-    	"""
-    	Do the actual polling of a single server
-    	"""
-    	
-    	# Use a separate log buffer for each poll, so that
-    	# we can store it in the database for easy lookup.
-    	log = aprs2_logbuf.PollingLog(self.log_poller)
-    	
-    	log.info("Poll thread started for %s", server['id'])
+        """
+        Do the actual polling of a single server
+        """
+        
+        # Use a separate log buffer for each poll, so that
+        # we can store it in the database for easy lookup.
+        log = aprs2_logbuf.PollingLog(self.log_poller)
+        
+        log.info("Poll thread started for %s", server['id'])
         p = aprs2_poll.Poll(log, server, self.software_type_cache)
         success = False
         try:
@@ -59,27 +59,26 @@ class Poller:
         
         props = p.properties
         now = int(time.time())
-    	
-    	state = self.red.getServerStatus(server['id'])
-    	if state == None:
-    	    state = {}
-    	
-    	if success == True:
-    	    state['status'] = 'ok'
-    	    state['last_ok'] = now
-    	    state['props'] = props
-    	else:
-    	    state['status'] = 'fail'
-    	    if props:
-    	        state['props'] = props
-    	    
+        
+        state = self.red.getServerStatus(server['id'])
+        if state == None:
+            state = {}
+        
+        if success == True:
+            state['status'] = 'ok'
+            state['last_ok'] = now
+            state['props'] = props
+        else:
+            state['status'] = 'fail'
+            if props:
+                state['props'] = props
+        
         state['errors'] = p.errors
-    	state['last_test'] = now
-    	
-    	self.red.setServerStatus(server['id'], state)
-    	self.red.storeServerLog(server['id'], { 't': now, 'log': log.buffer_string() })
-    	self.red.sendServerStatusMessage({ 'config': server, 'status': state })
-    	
+        state['last_test'] = now
+        
+        self.red.setServerStatus(server['id'], state)
+        self.red.storeServerLog(server['id'], { 't': now, 'log': log.buffer_string() })
+        self.red.sendServerStatusMessage({ 'config': server, 'status': state })
         
     def poll(self, server):
         """
@@ -136,7 +135,7 @@ class Poller:
         """
         Main polling loop
         """
-	
+        
         while True:
             # reap old threads
             self.loop_reap_old_threads()
@@ -144,7 +143,6 @@ class Poller:
             # start up new poll rounds, if thread limit allows
             if self.threads_now < self.threads_max:
                 self.loop_consider_polls()
-            
             time.sleep(1)
 
 poller = Poller()
