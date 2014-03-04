@@ -13,8 +13,6 @@ import aprs2_poll
 import aprs2_config
 import aprs2_logbuf
 
-pollInterval = 300
-
 # All configuration variables need to be strings originally.
 CONFIG_SECTION = 'poller'
 DEFAULT_CONF = {
@@ -44,7 +42,9 @@ class Poller:
             
         self.config.read(config_file)
         
-        # redis client                                            
+        self.poll_interval = self.config.getint(CONFIG_SECTION, 'poll_interval')
+        
+        # redis client
         self.red = aprs2_redis.APRS2Redis()
         self.config_manager = aprs2_config.ConfigManager(logging.getLogger('config'), self.red)
         
@@ -55,7 +55,7 @@ class Poller:
         
         # server software type cache
         self.software_type_cache = {}
-        
+    
     def perform_poll(self, server):
         """
         Do the actual polling of a single server
@@ -124,7 +124,7 @@ class Poller:
             i = to_poll.pop(0)
             server = self.red.getServer(i)
             if server:
-                self.red.setPollQ(i, int(time.time()) + pollInterval)
+                self.red.setPollQ(i, int(time.time()) + self.poll_interval)
                 self.poll(server)
             else:
                 self.log.info("Server %s has been deleted, removing from queue.", i)
