@@ -43,13 +43,23 @@ class TCPPoll:
             login_ok = s.recv(1024)
             self.log.debug('%s: Login response: %s', self.id, repr(login_ok))
             s.close()
-        except socket.error, msg:
+        except IOError, e:
             try:
                 s.close()
             except Exception:
                 pass
-            s = None    
-            return self.error('IS-socket', "APRS-IS socket error: %s" % msg)
+            s = None
+            if e.errno == 13:
+	        return self.error('IS-socket', "APRS-IS port firewalled: %s" % e)
+	    else:
+	        return self.error('IS-socket', "APRS-IS socket error: %s" % e)
+        except socket.error, e:
+            try:
+                s.close()
+            except Exception:
+                pass
+            s = None
+            return self.error('IS-socket', "APRS-IS socket error: %s" % e)
         
         s = None
         
