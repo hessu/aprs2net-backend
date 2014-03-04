@@ -17,7 +17,10 @@ import aprs2_logbuf
 CONFIG_SECTION = 'poller'
 DEFAULT_CONF = {
     # Server polling interval
-    'poll_interval': '300'
+    'poll_interval': '300',
+    
+    # Portal URL for downloading configs
+    'portal_base_url': 'https://home.tomh.us:8001'
 }
 
 class Poller:
@@ -42,11 +45,12 @@ class Poller:
             
         self.config.read(config_file)
         
+        self.portal_base_url = self.config.get(CONFIG_SECTION, 'portal_base_url')
         self.poll_interval = self.config.getint(CONFIG_SECTION, 'poll_interval')
         
         # redis client
         self.red = aprs2_redis.APRS2Redis()
-        self.config_manager = aprs2_config.ConfigManager(logging.getLogger('config'), self.red)
+        self.config_manager = aprs2_config.ConfigManager(logging.getLogger('config'), self.red, self.portal_base_url)
         
         # thread limits
         self.threads_now = 0
