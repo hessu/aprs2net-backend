@@ -4,6 +4,8 @@ import time
 import threading
 import logging
 import logging.config
+import sys
+import traceback
 
 import aprs2_redis
 import aprs2_poll
@@ -46,11 +48,17 @@ class Poller:
     	log = aprs2_logbuf.PollingLog(self.log_poller)
     	
     	log.info("Poll thread started for %s", server['id'])
-    	p = aprs2_poll.Poll(log, server, self.software_type_cache)
-    	success = p.poll()
-    	props = p.properties
-    	
-    	now = int(time.time())
+        p = aprs2_poll.Poll(log, server, self.software_type_cache)
+        success = False
+        try:
+            success = p.poll()
+        except Exception as ex:
+            etype, value, tb = sys.exc_info()
+            log.debug(''.join(traceback.format_exception(etype, value, tb)))
+            p.error('crash', 'Poller crashed: %r' % ex)
+        
+        props = p.properties
+        now = int(time.time())
     	
     	state = self.red.getServerStatus(server['id'])
     	if state == None:
