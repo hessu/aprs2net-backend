@@ -36,6 +36,9 @@ class APRS2Redis:
         self.red.hdel(kServer, id)
         self.red.hdel(kServerStatus, id)
         self.red.hdel(kServerLog, id)
+    
+    def getServerIds(self):
+        return self.red.hkeys(kServer)
         
     def getServerStatus(self, id):
     	"""
