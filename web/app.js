@@ -14,6 +14,7 @@ kServerLog = 'aprs2.serverlog';
 kPollQueue = 'aprs2.pollq';
 kScore = 'aprs2.score';
 kChannelStatus = 'aprs2.chStatus';
+kWebConfig = 'aprs2.webconfig';
 
 var evq_keep_events = 30;
 
@@ -120,14 +121,19 @@ function handle_full_status(req, res)
 				}
 			}
 			
-			res.setHeader('Cache-Control', 'no-cache');
-			res.json({
-				'result': 'ok',
-				'evq': {
-					'seq': evq_seq,
-					'len': evq_len
-				},
-				'servers': a
+			red.get(kWebConfig, function(err, cfg) {
+				cfg = JSON.parse(cfg);
+				
+				res.setHeader('Cache-Control', 'no-cache');
+				res.json({
+					'result': 'ok',
+					'cfg': cfg,
+					'evq': {
+						'seq': evq_seq,
+						'len': evq_len
+					},
+					'servers': a
+				});
 			});
 		});
 	});
@@ -154,11 +160,11 @@ var handle_upd = function(req, res) {
 		return;
 	}
 	
-	util.log("updating with seq " + seq);
+	//util.log("updating with seq " + seq);
 	var seq_dif = evq_seq - seq;
 	
 	if (seq_dif == 0) {
-		util.log("going longpoll");
+		//util.log("going longpoll");
 		// handler function
 		var notify = function(id) {
 			util.log("sending longpoll response, seq now " + id);
