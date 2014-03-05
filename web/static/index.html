@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html ng-app='aprs2status'>
 <head>
-<title>aprs2.net service status poller</title>
+<title>aprs2.net Status Monitor 2 Helsinki, FI</title>
 <meta name="lang" content="en" />
 <meta http-equiv="Content-Type" content="application/xhtml+xml;charset=UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -12,12 +12,15 @@
 
 <body ng-controller="a2stat">
 
-<div class='text-muted' style='position: fixed; bottom: 5px; right: 5px;'>event seq {{ evq.seq }} que {{ evq.len }}</div>
+<div class='text-muted' style='position: fixed; bottom: 5px; right: 5px;'>seq {{ evq.seq }} / {{ evq.len }}</div>
 
 <div class='container'>
 
  <div class="row">
-   <div class="col-md-3 col-sm-3"><div class="sprite_logo"></div></div>
+   <div class="col-md-3 col-sm-3">
+     <div class="sprite_logo"></div>
+     <div class="text-primary text-right">Status Monitor @ Helsinki, FI</div>
+     </div>
    <div class="col-md-3 col-sm-4 col-xs-6" ng-repeat="net in nets">
    	<b>{{ net.name }} Status</b><br />
    	14/17 servers OK</br />
@@ -36,11 +39,11 @@
 	</span>
 	</li>
 <li class="list-group-item" ng-show="shownServer.status.props.scorebase">
-	Score base:
+	<b>Scoring components</b>
 	<table class='table table-condensed table-striped' style='width: auto;'>
 	<tr><th ng-repeat="(k, v) in shownServer.status.props.scorebase">{{ k }}</th></tr>
 	<tr><td ng-repeat="(k, v) in shownServer.status.props.scorebase">{{ v[1] }}</td></tr>
-	<tr><td ng-repeat="(k, v) in shownServer.status.props.scorebase">{{ v[0] | number : 1 }}</td></tr>
+	<tr><td ng-repeat="(k, v) in shownServer.status.props.scorebase">+ {{ v[0] | number : 1 }}</td></tr>
 	</table>
 	</li>
 <li class="list-group-item list-group-item-danger" ng-show="shownServer.status.errors"><div ng-repeat="e in shownServer.status.errors">[{{ e[0] }}] {{ e[1] }}</div></li>
@@ -51,10 +54,15 @@
 <div class='row'>
 <div class='table-responsive'>
 <table class='table table-hover table-condensed'>
-<tr><th ng:repeat="c in columns" ng:class="selectedCls(c[0])" ng:click="changeSorting(c[0])">{{c[1]}}</th></tr>
+<tr>
+	<th ng:repeat="c in columns"
+		ng:class="selectedCls(c[0])"
+		ng:click="changeSorting(c[0])">{{c[1]}} <span ng:class="sortIndicator(c[0])"></span></th>
+	</tr>
+
 <tr ng-repeat="s in servers | orderBy : sort.column : sort.descending" ng-click="rowClick(s);"
 	ng-class="{success: s.status.status=='ok', danger: s.status.status=='fail', keydown: s.duration==-1}">
-	<td>{{ s.config.id }}</td> 
+	<td><a target="_blank" rel="nofollow" href="http://{{ s.config.ipv4 }}:14501/">{{ s.config.id }}</a></td>
 	<td>{{ s.status.props.soft }} {{ s.status.props.vers }}</td>
 	<td>{{ s.status.props.os }}</td>
 	<td>{{ s.status.last_test | datetime }}</td>
@@ -66,6 +74,10 @@
 	</tr>
 </table>
 </div>
+</div>
+
+<div class='row text-center text-muted'>
+aprs2.net status monitor v2.0 by OH7LZB
 </div>
 
 </div>

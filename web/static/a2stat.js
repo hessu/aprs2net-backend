@@ -179,7 +179,6 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 	};
 	
 	$scope.rowClick = function(s) {
-		console.log("rowClick: " + s);
 		$scope.shownServer = s;
 		fetchLog(s.config.id);
 	}
@@ -201,13 +200,16 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 		descending: false
 	};
 	
-	$scope.selectedCls = function(column) {
-		return column == $scope.sort.column && 'sort-' + $scope.sort.descending;
+	$scope.sortIndicator = function(column) {
+		if (column == $scope.sort.column) {
+			return 'glyphicon glyphicon-sort-by-attributes'
+				+ (($scope.sort.descending) ? '-alt' : '');
+		}
+		return '';
 	};
 	
 	$scope.changeSorting = function(column) {
 		var sort = $scope.sort;
-		console.log("sorting by " + column);
 		
 		if (sort.column == column) {
 			sort.descending = !sort.descending;
