@@ -93,34 +93,43 @@ class ConfigManager:
                 
             time.sleep(POLL_INTERVAL)
     
-    def refresh_config(self):
+    def fetch_config(self, url):
         """
-        Fetch configuration from the portal
+        Fetch one config object
         """
-        self.log.info("Fetching current server list from portal...")
-        
         t_start = time.time()
         try:
             # TODO: Enable CA verification again!
-            r = requests.get(self.portal_servers_url, headers=self.rhead, timeout=self.http_timeout, verify=False)
+            r = requests.get(url, headers=self.rhead, timeout=self.http_timeout, verify=False)
             r.raise_for_status()
+            d = r.content
         except Exception as e:
-            self.log.info("Portal: %s - Connection error: %r", self.portal_servers_url, e)
+            self.log.info("Portal: %s - Connection error: %r", url, e)
             return False
             
         t_end = time.time()
         t_dur = t_end - t_start
         
         if r.status_code != 200:
-            self.log.error("Portal: %s - Failed download, code: %r", self.portal_servers_url, r.status_code)
+            self.log.error("Portal: %s - Failed download, code: %r", url, r.status_code)
             return False
-        
-        d = r.content
         
         try:
             j = json.loads(d)
         except Exception as e:
-            self.log.error("Portal: servers.json parsing failed: %r", e)
+            self.log.error("Portal: JSON parsing failed (%s): %r", url, e)
+            return False
+        
+        return j
+    
+    def refresh_config(self):
+        """
+        Fetch configuration from the portal
+        """
+        self.log.info("Fetching current server list from portal...")
+        j = self.fetch_config(self.portal_servers_url)
+        
+        if j == False:
             return False
         
         return self.process_config_json(j)
