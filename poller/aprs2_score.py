@@ -36,12 +36,12 @@ class Score:
         self.rtt_good_enough = 0.4
         
         # Multiply the HTTP RTT by N before adding to score.
-        # 30: rtt of 2.4 seconds will add 60 to score.
-        self.http_rtt_mul = 30
+        # 50: rtt of 2.4 seconds will add 60 to score.
+        self.http_rtt_mul = 50
         
-        # Multiply the TCP APRS-IS score by N before adding to score.
+        # Multiply the TCP APRS-IS rtt by N before adding to score.
         # It will be divided by the number of APRS-IS ports successfully polled (ipv4, ipv6: 2)
-        self.aprsis_rtt_mul = 30
+        self.aprsis_rtt_mul = 40
         
         # poll time, in seconds (float), per address family ("ipv4", "ipv6")
         self.poll_t_14580 = {}
@@ -90,13 +90,13 @@ class Score:
         rtt_sum = 0
         for k in self.poll_t_14580:
             t = self.poll_t_14580.get(k, 30) # default 30 seconds, if not found (should not happen)
-            rtt_sum += self.poll_t_14580.get(k, 30)
-            is_score += max(0, t - self.rtt_good_enough) * self.aprsis_rtt_mul
+            rtt_sum += t
+            is_score += max(0.0, t - self.rtt_good_enough) * self.aprsis_rtt_mul
         
         is_score = is_score / len(self.poll_t_14580)
         rtt_avg = rtt_sum / len(self.poll_t_14580)
         self.score_add('aprsis_rtt', is_score,
-        	'%.3f s' % rtt_sum)
+        	'%.3f s' % rtt_avg)
         
         #
         # Amount of users
@@ -106,7 +106,7 @@ class Score:
         loads = [ props.get('worst_load', 100) ]
         
         load = max(loads)
-        self.score_add('user_load', load*10.0, '%.0f %%' % load)
+        self.score_add('user_load', load*10.0, '%.1f %%' % load)
         
         self.round_components()
         
