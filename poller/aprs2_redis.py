@@ -33,6 +33,12 @@ class APRS2Redis:
     def sendServerStatusMessage(self, msg):
         self.red.publish(kChannelStatus, json.dumps(msg))
     
+    def setServerStatus(self, id, status):
+        """
+        Store server status
+        """
+        return self.red.hset(kServerStatus, id, json.dumps(status))
+        
     def delServer(self, id):
         self.red.hdel(kServer, id)
         self.red.hdel(kServerStatus, id)
