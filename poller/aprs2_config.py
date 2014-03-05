@@ -97,6 +97,8 @@ class ConfigManager:
         """
         Fetch one config object
         """
+        self.log.info("Fetching %s", url)
+        
         t_start = time.time()
         try:
             # TODO: Enable CA verification again!
@@ -127,8 +129,8 @@ class ConfigManager:
         Fetch configuration from the portal
         """
         self.log.info("Fetching current server list from portal...")
-        j = self.fetch_config(self.portal_servers_url)
         
+        j = self.fetch_config(self.portal_rotates_url)
         if j == False:
             return False
         
@@ -140,11 +142,20 @@ class ConfigManager:
         """
         
         polled = {}
+        uniqs = {}
         
-        for id in j:
-            c = j.get(id)
+        for rid in j:
+            self.log.debug("rotate %s", rid)
+            rotate = j.get(rid)
+            for id in rotate:
+                self.log.debug("  server %s", id)
+                uniqs[id] = rotate.get(id)
+        
+        self.log.info("Saving servers...")
+        for id in uniqs:
+            c = uniqs.get(id)
             id = id.upper()
-            self.log.debug("%s: %r", id, c)
+            #self.log.debug("%s: %r", id, c)
             c['id'] = id
             
             # We do not support IPv6-only servers for now.
@@ -163,6 +174,7 @@ class ConfigManager:
         
         # TODO: add sanity check for too few servers
         
+        self.log.info("Applied new server configuration")
         self.pollq_cleanup(polled)
     
     def pollq_cleanup(self, polled):
