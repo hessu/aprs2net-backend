@@ -16,6 +16,9 @@ import aprs2_logbuf
 # All configuration variables need to be strings originally.
 CONFIG_SECTION = 'poller'
 DEFAULT_CONF = {
+    # Site description
+    'site_descr': 'Unconfigured, CC',
+    
     # Server polling interval
     'poll_interval': '300',
     
@@ -48,8 +51,14 @@ class Poller:
         self.portal_base_url = self.config.get(CONFIG_SECTION, 'portal_base_url')
         self.poll_interval = self.config.getint(CONFIG_SECTION, 'poll_interval')
         
+        # config object for the web UI
+        self.web_config = {
+            'site_descr': self.config.get(CONFIG_SECTION, 'site_descr')
+        }
+        
         # redis client
         self.red = aprs2_redis.APRS2Redis()
+        self.red.setWebConfig(self.web_config)
         self.config_manager = aprs2_config.ConfigManager(logging.getLogger('config'), self.red, self.portal_base_url)
         
         # thread limits

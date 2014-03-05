@@ -15,6 +15,7 @@ kServerLog = 'aprs2.serverlog'
 kPollQueue = 'aprs2.pollq'
 kScore = 'aprs2.score'
 kChannelStatus = 'aprs2.chStatus'
+kWebConfig = 'aprs2.webconfig'
 
 class APRS2Redis:
     def __init__(self, host='localhost', port=6379):
@@ -23,14 +24,14 @@ class APRS2Redis:
         """
         self.red = redis.Redis(host=host, port=port, db=0)
     
+    def setWebConfig(self, conf):
+        """
+        Store web UI config
+        """
+    	return self.red.set(kWebConfig, json.dumps(conf))
+    
     def sendServerStatusMessage(self, msg):
         self.red.publish(kChannelStatus, json.dumps(msg))
-    
-    def setServerStatus(self, id, status):
-        """
-        Store server status
-        """
-    	return self.red.hset(kServerStatus, id, json.dumps(status))
     
     def delServer(self, id):
         self.red.hdel(kServer, id)
