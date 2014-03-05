@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html ng-app='aprs2status'>
 <head>
-<title>aprs2.net Status Monitor 2 Helsinki, FI</title>
+<title>aprs2.net Status Monitor</title>
 <meta name="lang" content="en" />
 <meta http-equiv="Content-Type" content="application/xhtml+xml;charset=UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -19,7 +19,7 @@
  <div class="row">
    <div class="col-md-3 col-sm-3">
      <div class="sprite_logo"></div>
-     <div class="text-primary text-right">Status Monitor @ Helsinki, FI</div>
+     <div class="text-primary text-right">Status Monitor @ {{ cfg.site_descr }}</div>
      </div>
    <div class="col-md-3 col-sm-4 col-xs-6" ng-repeat="net in nets">
    	<b>{{ net.name }} Status</b><br />

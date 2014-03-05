@@ -275,6 +275,7 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 			console.log('HTTP full download received, status: ' + d['result']);
 			
 			$scope.evq = evq = d['evq'];
+			$scope.cfg = d['cfg'];
 			var a = [];
 			var s = d['servers'];
 			servermap = {};
