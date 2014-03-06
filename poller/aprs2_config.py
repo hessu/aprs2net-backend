@@ -149,6 +149,8 @@ class ConfigManager:
             rotate = j.get(rid)
             
             servers = rotate.get('servers')
+            del rotate['servers']
+            self.red.storeRotate(rid, rotate)
             
             for id in servers:
                 self.log.debug("  server %s", id)

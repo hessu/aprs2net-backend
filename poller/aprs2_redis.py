@@ -16,6 +16,7 @@ kPollQueue = 'aprs2.pollq'
 kScore = 'aprs2.score'
 kChannelStatus = 'aprs2.chStatus'
 kWebConfig = 'aprs2.webconfig'
+kRotate = 'aprs2.rotate'
 
 class APRS2Redis:
     def __init__(self, host='localhost', port=6379):
@@ -129,4 +130,21 @@ class APRS2Redis:
     	"""
     	
     	return self.red.zrem(kScore, id)
+    
+    def storeRotate(self, id, rot):
+    	"""
+    	Store a single rotate configuration
+    	"""
+    	return self.red.hset(kRotate, id, json.dumps(rot))
+    
+    def getRotates(self):
+    	"""
+    	Get a all rotate configurations
+    	"""
+    	
+    	d = self.red.hgetall(kRotate)
+    	if d == None:
+    		return d
+    	
+    	return json.loads(d)
     
