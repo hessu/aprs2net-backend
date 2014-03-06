@@ -143,18 +143,30 @@ class ConfigManager:
         
         polled = {}
         uniqs = {}
+        members = {}
         
         for rid in j:
             self.log.debug("rotate %s", rid)
-            rotate = j.get(rid)
             
+            rotate = j.get(rid)
             servers = rotate.get('servers')
             del rotate['servers']
-            self.red.storeRotate(rid, rotate)
+            
+            members[rid] = []
             
             for id in servers:
                 self.log.debug("  server %s", id)
-                uniqs[id] = servers.get(id)
+                new = servers.get(id)
+                members[rid].append(id)
+                old = uniqs.get(id)
+                if old != None:
+                    old['rotates'].append(rid)
+                else:
+                    new['rotates'] = [ rid ]
+                    uniqs[id] = new
+                    
+            rotate['members'] = members[rid]
+            self.red.storeRotate(rid, rotate)
         
         self.log.info("Saving servers...")
         for id in uniqs:
