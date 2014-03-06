@@ -160,9 +160,9 @@ class ConfigManager:
                 members[rid].append(id)
                 old = uniqs.get(id)
                 if old != None:
-                    old['rotates'].append(rid)
+                    old['member'].append(rid)
                 else:
-                    new['rotates'] = [ rid ]
+                    new['member'] = [ rid ]
                     uniqs[id] = new
                     
             rotate['members'] = members[rid]

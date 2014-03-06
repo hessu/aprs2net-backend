@@ -15,6 +15,7 @@ kPollQueue = 'aprs2.pollq';
 kScore = 'aprs2.score';
 kChannelStatus = 'aprs2.chStatus';
 kWebConfig = 'aprs2.webconfig';
+kRotate = 'aprs2.rotate';
 
 var evq_keep_events = 30;
 
@@ -111,30 +112,36 @@ function handle_full_status(req, res)
 		for (i in stats)
 			stats[i] = JSON.parse(stats[i]);
 		
-		red.hgetall(kServer, function (err, confs) {
-			var a = [];
+		red.hgetall(kRotate, function (err, rots) {
+			for (i in rots)
+				rots[i] = JSON.parse(rots[i]);
 			
-			for (i in confs) {
-				if (stats[i]) {
-					a.push({
-						'config': JSON.parse(confs[i]),
-						'status': stats[i]
-					});
-				}
-			}
-			
-			red.get(kWebConfig, function(err, cfg) {
-				cfg = JSON.parse(cfg);
+			red.hgetall(kServer, function (err, confs) {
+				var a = [];
 				
-				res.setHeader('Cache-Control', 'no-cache');
-				res.json({
-					'result': 'ok',
-					'cfg': cfg,
-					'evq': {
-						'seq': evq_seq,
-						'len': evq_len
-					},
-					'servers': a
+				for (i in confs) {
+					if (stats[i]) {
+						a.push({
+							'config': JSON.parse(confs[i]),
+							'status': stats[i]
+						});
+					}
+				}
+				
+				red.get(kWebConfig, function(err, cfg) {
+					cfg = JSON.parse(cfg);
+					
+					res.setHeader('Cache-Control', 'no-cache');
+					res.json({
+						'result': 'ok',
+						'cfg': cfg,
+						'evq': {
+							'seq': evq_seq,
+							'len': evq_len
+						},
+						'rotates': rots,
+						'servers': a
+					});
 				});
 			});
 		});
