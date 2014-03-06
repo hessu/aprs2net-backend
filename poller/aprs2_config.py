@@ -147,9 +147,12 @@ class ConfigManager:
         for rid in j:
             self.log.debug("rotate %s", rid)
             rotate = j.get(rid)
-            for id in rotate:
+            
+            servers = rotate.get('servers')
+            
+            for id in servers:
                 self.log.debug("  server %s", id)
-                uniqs[id] = rotate.get(id)
+                uniqs[id] = servers.get(id)
         
         self.log.info("Saving servers...")
         for id in uniqs:
