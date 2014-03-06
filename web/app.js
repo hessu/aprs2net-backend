@@ -105,6 +105,8 @@ function upd_response(seq, res)
 
 function handle_full_status(req, res)
 {
+	util.log("full req: " + JSON.stringify(req.query));
+	
 	red.hgetall(kServerStatus, function (err, stats) {
 		for (i in stats)
 			stats[i] = JSON.parse(stats[i]);
@@ -141,7 +143,7 @@ function handle_full_status(req, res)
 }
 
 var handle_upd = function(req, res) {
-	util.log("got upd req: " + JSON.stringify(req.query));
+	util.log("upd req: " + JSON.stringify(req.query));
 	
 	var seq = parseInt(req.query['seq']);
 	if (seq == undefined) {
@@ -151,10 +153,10 @@ var handle_upd = function(req, res) {
 		return;
 	}
 	if (seq > evq_seq) {
-		console.log("client seq " + seq + " > my seq " + evq_seq + " - starting from -1");
+		//console.log("client seq " + seq + " > my seq " + evq_seq + " - starting from -1");
 		seq = -1;
 	} else if (evq_seq - seq > evq_len) {
-		console.log("client is too late, doing full reload");
+		//console.log("client is too late, doing full reload");
 		res.setHeader('Cache-Control', 'no-cache');
 		res.json({ 'result': 'reload' });
 		return;
@@ -181,7 +183,7 @@ var handle_upd = function(req, res) {
 };
 
 var handle_slog = function(req, res) {
-	util.log("got slog req: " + JSON.stringify(req.query));
+	util.log("slog req: " + JSON.stringify(req.query));
 	
 	var id = req.query['id'];
 	if (id == undefined) {
@@ -198,11 +200,11 @@ var handle_slog = function(req, res) {
 	});
 };
 
-app.get('/api/full', handle_full_status); 
-app.get('/api/upd', handle_upd); 
-app.get('/api/slog', handle_slog); 
+app.get('/api/full', handle_full_status); /* fetch full server list */
+app.get('/api/upd', handle_upd); /* fetch updates to servers */
+app.get('/api/slog', handle_slog); /* fetch a poll log of a server */
 
-util.log("aprs2-status set up, starting listener");
+util.log("aprs2-status web service set up, starting listener");
 
 app.listen(8036);
 
