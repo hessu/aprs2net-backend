@@ -101,8 +101,8 @@ function dur_str_ms(i)
 }
 
 var evq = {};
-var servers = [];
 var servermap = {};
+var groupidmap = {};
 
 /*
  *	give a go at using AngularJS
@@ -155,11 +155,11 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 	
 	/* Support for service status */
 	$scope.nets = [
-		{ id: 'core', name: 'Core' },
-		{ id: 't2hub', name: 'T2 Hubs' },
-		{ id: 't2leaf', name: 'T2 Leafs' },
-		{ id: 'cwop', name: 'CWOP' },
-		{ id: 'fire', name: 'Firenet' }
+//		{ id: 'rotate.aprs.net', name: 'Core' },
+		{ id: 'hubs.aprs2.net', name: 'T2 Hubs' },
+		{ id: 'rotate.aprs2.net', name: 'T2 Leafs' },
+//		{ id: 'cwop.aprs.net', name: 'CWOP' },
+		{ id: 'firenet.aprs2.net', name: 'Firenet' }
 	];
 	
 	/* Poll log display support */
@@ -219,8 +219,6 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 		}
 	};
 	
-	$scope.servers = servers;
-	
 	var full_load;
 	var ajax_update = function($scope, $http) {
 		var config = {
@@ -250,7 +248,7 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 					console.log("  server " + id);
 					var idx = servermap[id];
 					if (idx) {
-						servers[idx] = srvr;
+						groups[groupmap[id]][groupidmap[id]] = srvr;
 						if ($scope.shownServer && id == $scope.shownServer.config.id) {
 							$scope.shownServer = srvr;
 							console.log("  shown server, fetching log");
@@ -279,11 +277,32 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 			var a = [];
 			var s = d['servers'];
 			servermap = {};
-			$scope.servers = servers = s;
+			groupmap = {};
 			
-			for (var i in s) {
-				servermap[s[i]['config']['id']] = i;
+			groups = {};
+			for (var i in $scope.nets) {
+				var n = $scope.nets[i];
+				//console.log("  group " + i + ": " + n.id);
+				var rot = d['rotates'][n.id];
+				groups[n.id] = [];
+				
+				for (var id in rot['members']) {
+					groupmap[rot['members'][id]] =  n.id;
+					//console.log("     - " + rot['members'][id]);
+				}
 			}
+			
+			tables = {};
+			for (var i in s) {
+				var id = s[i]['config']['id'];
+				servermap[id] = i;
+				groupidmap[id] = groups[groupmap[id]].length
+				groups[groupmap[id]].push(s[i]);
+				//console.log("   " + id + " pushed to " + groupmap[id] + " at position " + groupidmap[id]);
+			}
+			
+			$scope.groups = groups;
+			$scope.rotates = d['rotates'];
 			
 			setTimeout(function() { ajax_update($scope, $http); }, 1200);
 		}).error(function(data, status, headers, config) {
