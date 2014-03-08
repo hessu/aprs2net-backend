@@ -279,17 +279,17 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 			servermap = {};
 			groupmap = {};
 			
-			groups = {};
+			groups = [];
 			for (var i in $scope.nets) {
 				var n = $scope.nets[i];
-				//console.log("  group " + i + ": " + n.id);
+				console.log("  group " + i + ": " + n.id);
 				var rot = d['rotates'][n.id];
-				groups[n.id] = [];
 				
 				for (var id in rot['members']) {
-					groupmap[rot['members'][id]] =  n.id;
+					groupmap[rot['members'][id]] = groups.length;
 					//console.log("     - " + rot['members'][id]);
 				}
+				groups.push([]);
 			}
 			
 			tables = {};
