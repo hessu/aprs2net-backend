@@ -557,10 +557,10 @@ class Poll:
         if self.id.startswith('T2HUB'):
             port = 20152
         
-        for ac in ('ipv4', 'ipv6'):
+        for ac, prefix in (('ipv4', 'IS4'), ('ipv6', 'IS6')):
             if self.server.get(ac) != None:
                 t_start = time.time()
-                [code, msg] = t.poll(self.server[ac], port, self.id)
+                [code, msg] = t.poll(self.server[ac], port, self.id, prefix)
                 t_dur = time.time() - t_start
                 
                 if code != 'ok':
