@@ -103,6 +103,13 @@ class Poller:
             state['status'] = 'fail'
             if props:
                 state['props'] = props
+            else:
+                old_props = state.get('props', {})
+                if old_props:
+                    keep_props = {}
+                    for i in ('type', 'soft', 'vers', 'os', 'id'):
+                        keep_props[i] = old_props.get(i)
+                    state['props'] = keep_props
         
         state['errors'] = p.errors
         state['last_test'] = now
