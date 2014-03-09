@@ -28,14 +28,16 @@ javap3_re_num = {
 javap3_re_uptime = re.compile('(\\d+)(\\.\d+){0,1}([dhms])(.*)')
 
 class Poll:
-    def __init__(self, log, server, software_type_cache):
+    def __init__(self, log, server, software_type_cache, rates_cache):
         self.log = log
         self.server = server
         self.software_type_cache = software_type_cache
+        self.rates_cache = rates_cache
         self.id = server['id']
         self.status_url = 'http://%s:14501/' % self.server['ipv4']
         self.rhead = {'User-agent': 'aprs2net-poller/2.0'}
         self.http_timeout = 5.0
+        self.http_got_t = None
         self.client_cap = 300
         
         self.try_order = ['javap3', 'aprsc', 'javap4']
@@ -96,6 +98,8 @@ class Poll:
             if self.check_properties() == False:
                 return False
                 
+            self.calculate_rates()
+            
             self.log.debug("%s: Server users %d/%d (%.1f %% total, %.1f %% worst-case)",
                 self.id, self.properties['clients'], self.properties['clients_max'], self.properties['user_load'], self.properties['worst_load'])
             
@@ -138,6 +142,31 @@ class Poll:
             return self.error('id-mismatch', 'Server ID mismatch: "%s" on server, "%s" expected' % (self.properties.get('id'), self.id))
         
         return True
+    
+    def calculate_rates(self):
+        """
+        Calculate bytes/sec rates
+        """
+        
+        now = time.time()
+        rkeys = {
+            'total_bytes_in': 'rate_bytes_in',
+            'total_bytes_out': 'rate_bytes_out',
+        }
+        
+        prev = self.rates_cache.get(self.id)
+        if prev:
+            dur_t = now - prev['t']
+            for i in rkeys.keys():
+                if self.properties[i] > prev[i]:
+                    self.properties[rkeys[i]] = (self.properties[i] - prev[i]) / dur_t
+        
+        prev = {
+            't' : now
+        }
+        for i in rkeys.keys():
+            prev[i] = self.properties[i]
+        self.rates_cache[self.id] = prev
     
     def javap3_decode_uptime(self, s):
     	"""

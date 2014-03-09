@@ -68,6 +68,8 @@ class Poller:
         
         # server software type cache
         self.software_type_cache = {}
+        # cache for rate stats
+        self.rates_cache = {}
     
     def perform_poll(self, server):
         """
@@ -79,7 +81,7 @@ class Poller:
         log = aprs2_logbuf.PollingLog(self.log_poller)
         
         log.info("Poll thread started for %s", server['id'])
-        p = aprs2_poll.Poll(log, server, self.software_type_cache)
+        p = aprs2_poll.Poll(log, server, self.software_type_cache, self.rates_cache)
         success = False
         try:
             success = p.poll()
