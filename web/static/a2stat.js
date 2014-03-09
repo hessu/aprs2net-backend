@@ -220,6 +220,7 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 		[ 'status.last_ok', 'Last OK' ],
 		[ 'status.props.clients', 'Clients' ],
 		[ 'status.props.worst_load', 'C load' ],
+		[ 'status.props.rate_bytes_out', 'B out/s' ],
 		[ 'status.props.score', 'Score' ],
 		[ 'status.props.info', 'Info' ]
 	];
