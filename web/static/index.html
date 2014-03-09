@@ -23,8 +23,8 @@
      </div>
    <div class="col-md-3 col-sm-4 col-xs-6" ng-repeat="net in nets">
    	<b>{{ net.name }} Status</b><br />
-   	14/17 servers OK</br />
-   	123 users<br />
+   	{{ net.servers_ok }}/{{ net.servers_count }} servers OK</br />
+   	{{ net.clients }} clients<br />
    </div>
  </div>
 

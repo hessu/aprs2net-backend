@@ -162,6 +162,35 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 		{ id: 'firenet.aprs2.net', name: 'Firenet' }
 	];
 	
+	var summary_update = function() {
+		for (var i in $scope.nets) {
+			var n = $scope.nets[i];
+			console.log("summary_update group " + i + ": " + n.id);
+			
+			var clients = 0;
+			var servers_ok = 0;
+			for (var d in groups[i]) {
+				s = groups[i][d];
+				if (!s.config) {
+					console.log("No config in JSON: " + JSON.stringify(s));
+					continue;
+				}
+				//console.log("   server " + s.config.id);
+				if (s.status) {
+					if (s.status.status == 'ok')
+						servers_ok += 1;
+						
+					if (s.status.props && s.status.props.clients)
+						clients += s.status.props.clients;
+				}
+			}
+			n.clients = clients;
+			n.servers_ok = servers_ok;
+			n.servers_count = groups[i].length;
+			console.log("   " + servers_ok + " servers ok, " + clients + " clients");
+		}
+	};
+	
 	/* Poll log display support */
 	$scope.showLog = false;
 	
@@ -219,6 +248,8 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 		}
 	};
 	
+	/* Ajax updates */
+	
 	var full_load;
 	var ajax_update = function($scope, $http) {
 		var config = {
@@ -249,6 +280,7 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 					var idx = servermap[id];
 					if (idx) {
 						groups[groupmap[id]][groupidmap[id]] = srvr;
+						console.log("   added: " + JSON.stringify(srvr));
 						if ($scope.shownServer && id == $scope.shownServer.config.id) {
 							$scope.shownServer = srvr;
 							console.log("  shown server, fetching log");
@@ -259,6 +291,8 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 					}
 				}
 			}
+			
+			summary_update();
 			
 			setTimeout(function() { ajax_update($scope, $http); }, 1200);
 		}).error(function(data, status, headers, config) {
@@ -275,7 +309,7 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 			$scope.evq = evq = d['evq'];
 			$scope.cfg = d['cfg'];
 			var a = [];
-			var s = d['servers'];
+			var servers = d['servers'];
 			servermap = {};
 			groupmap = {};
 			
@@ -293,16 +327,18 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 			}
 			
 			tables = {};
-			for (var i in s) {
-				var id = s[i]['config']['id'];
+			for (var i in servers) {
+				var id = servers[i]['config']['id'];
 				servermap[id] = i;
 				groupidmap[id] = groups[groupmap[id]].length
-				groups[groupmap[id]].push(s[i]);
+				groups[groupmap[id]].push(servers[i]);
 				//console.log("   " + id + " pushed to " + groupmap[id] + " at position " + groupidmap[id]);
 			}
 			
 			$scope.groups = groups;
 			$scope.rotates = d['rotates'];
+			
+			summary_update();
 			
 			setTimeout(function() { ajax_update($scope, $http); }, 1200);
 		}).error(function(data, status, headers, config) {
