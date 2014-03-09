@@ -169,6 +169,7 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 			
 			var clients = 0;
 			var servers_ok = 0;
+			var rate_out = 0;
 			for (var d in groups[i]) {
 				s = groups[i][d];
 				if (!s.config) {
@@ -180,13 +181,18 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 					if (s.status.status == 'ok')
 						servers_ok += 1;
 						
-					if (s.status.props && s.status.props.clients)
-						clients += s.status.props.clients;
+					if (s.status.props) {
+						if (s.status.props.clients)
+							clients += s.status.props.clients;
+						if (s.status.props.rate_bytes_out)
+							rate_out += s.status.props.rate_bytes_out;
+					}
 				}
 			}
 			n.clients = clients;
 			n.servers_ok = servers_ok;
 			n.servers_count = groups[i].length;
+			n.rate_out = rate_out;
 			console.log("   " + servers_ok + " servers ok, " + clients + " clients");
 		}
 	};

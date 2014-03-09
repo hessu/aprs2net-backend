@@ -25,6 +25,7 @@
    	<b>{{ net.name }} Status</b><br />
    	{{ net.servers_ok }}/{{ net.servers_count }} servers OK</br />
    	{{ net.clients }} clients<br />
+   	{{ net.rate_out | number : 0 }} bytes/s out<br />
    </div>
  </div>
 
