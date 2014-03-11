@@ -11,3 +11,15 @@ License
 This code is released under the BSD license, which can be found in the file
 LICENSE.
 
+
+Installation
+---------------
+
+Install dependencies:
+
+   apt-get install git redis-server python python-redis
+
+Download:
+
+   git clone -b release https://github.com/hessu/aprs2net-backend.git
+
