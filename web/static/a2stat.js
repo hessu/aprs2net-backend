@@ -260,7 +260,7 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 	var full_load;
 	var ajax_update = function($scope, $http) {
 		var config = {
-			'timeout': 30000,
+			'timeout': 35000,
 			'params': { 'seq': evq['seq'] }
 		};
 		
