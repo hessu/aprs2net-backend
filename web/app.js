@@ -213,6 +213,6 @@ app.get('/api/slog', handle_slog); /* fetch a poll log of a server */
 
 util.log("aprs2-status web service set up, starting listener");
 
-app.listen(8036);
+app.listen(8036, 'localhost');
 
 
