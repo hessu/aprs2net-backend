@@ -17,9 +17,16 @@ Installation
 
 Install dependencies:
 
-   apt-get install git redis-server python python-redis
+   apt-get install git redis-server python python-redis nodejs nginx python-lxml
 
 Download:
 
+   cd /opt
+   adduser t2poll, addgroup t2poll (TODO, work out details)
    git clone -b release https://github.com/hessu/aprs2net-backend.git
+
+Adjust nginx config:
+
+  rm /etc/nginx/sites-enabled/default
+  cd /etc/nginx/sites-enabled && ln -s ...
 
