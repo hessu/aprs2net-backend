@@ -174,15 +174,34 @@ var handle_upd = function(req, res) {
 	
 	if (seq_dif == 0) {
 		//util.log("going longpoll");
-		// handler function
+		
+		/* Set a timeout, so that we can close the longpoll request
+		 * from the server side - client-side timeout will close
+		 * the HTTP connection and require a new TCP setup.
+		 * Would loose the benefits of keepalive.
+		 */
+		var tout = setTimeout(function() {
+			util.log("sending longpoll timeout");
+			emitter.removeListener("event:notify", notify);
+			upd_response(seq, res);
+		}, 25000);
+		
+		/* handler for sending response */
 		var notify = function(id) {
+			clearTimeout(tout);
 			util.log("sending longpoll response, seq now " + id);
 			upd_response(seq, res);
 		};
+		
 		// when we have an event, return response
 		emitter.once("event:notify", notify);
+		
 		// if the client closes, remove listener
-		req.on("close", function() { util.log("client closed in middle of longpoll"); emitter.removeListener("event:notify", notify); });
+		req.on("close", function() {
+			clearTimeout(tout);
+			util.log("client closed in middle of longpoll");
+			emitter.removeListener("event:notify", notify);
+		});
 		return;
 	}
 	
@@ -213,6 +232,7 @@ app.get('/api/slog', handle_slog); /* fetch a poll log of a server */
 
 util.log("aprs2-status web service set up, starting listener");
 
+//app.listen(8036);
 app.listen(8036, 'localhost');
 
 
