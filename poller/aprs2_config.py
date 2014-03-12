@@ -69,6 +69,7 @@ class ConfigManager:
         self.portal_base_url = portal_base_url
         self.portal_servers_url = '%s/sysop/servers.json' % self.portal_base_url
         self.portal_rotates_url = '%s/sysop/rotates.json' % self.portal_base_url
+        self.config_etag = None
         
         self.shutdown = False
         
@@ -93,7 +94,7 @@ class ConfigManager:
                 
             time.sleep(POLL_INTERVAL)
     
-    def fetch_config(self, url):
+    def fetch_config(self, url, etag=None):
         """
         Fetch one config object
         """
@@ -116,13 +117,16 @@ class ConfigManager:
             self.log.error("Portal: %s - Failed download, code: %r", url, r.status_code)
             return False
         
+        new_etag = r.headers.get('etag')
+        self.log.info("Portal: Got etag %r", new_etag)
+        
         try:
             j = json.loads(d)
         except Exception as e:
             self.log.error("Portal: JSON parsing failed (%s): %r", url, e)
             return False
         
-        return j
+        return (j, new_etag)
     
     def refresh_config(self):
         """
@@ -130,9 +134,11 @@ class ConfigManager:
         """
         self.log.info("Fetching current server list from portal...")
         
-        j = self.fetch_config(self.portal_rotates_url)
+        j, new_etag = self.fetch_config(self.portal_rotates_url, self.config_etag)
         if j == False:
             return False
+        
+        self.config_etag = new_etag
         
         return self.process_config_json(j)
     
