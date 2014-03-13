@@ -444,6 +444,55 @@ class Poll:
         self.properties['user_load'] = float(self.properties['clients']) / float(min(self.client_cap, self.properties['clients_max'])) * 100.0
         self.properties['worst_load'] = self.properties['user_load']
         
+        #
+        # uplinks
+        #
+        
+        clientrcv = clients_tag.findall('clientrcv')
+        if clientrcv != None:
+            upl = []
+            currtime = time_tag.find('current')
+            if currtime == None:
+                return self.error('web-parse-fail', "detail.xml: No 'current' time tag found")
+            currtime = float(currtime.attrib.get("utc"))
+            
+            for cl in clientrcv:
+                #self.log.debug(" client")
+                
+                logi = cl.find("login")
+                if logi == None:
+                    continue
+                    
+                tm = cl.find("time")
+                if tm == None:
+                    continue
+                    
+                callssid = logi.find("callssid")
+                up = cl.find("upstream")
+                rcv = cl.find("rcvdfrom")
+                rem = cl.find("remoteserver")
+                ctime = tm.find("connect")
+                
+                if callssid == None or up == None or up.text != "true" or ctime == None:
+                    continue
+                
+                ctime = float(ctime.attrib.get("utc"))
+                uptime = (currtime - ctime) / 1000
+                
+                self.log.debug(" upstream client %s", callssid.text)
+                
+                rem = "%s:%s" % (rem.text, rem.attrib.get('port', ''))
+                
+                upl.append({
+                    'id': callssid.text,
+                    'addr_rem': rem,
+                    'up': int(uptime),
+                    'rx_packets': int(rcv.attrib.get('packets', '0')),
+                })
+                
+            self.properties['uplinks'] = upl
+                
+        
         return True
         
     def poll_aprsc(self):
