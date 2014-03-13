@@ -25,7 +25,27 @@ javap3_re_num = {
     'total_bytes_out': re.compile('<TD[^>]*>Total Bytes Out</TD><TD>([\\d,\\.\']+)</TD>'),
 }
 
+javap3_re_outbound = re.compile('<TH[^>]*>Outbound Connections</TH>.*?<TR[^>]*>.*?</TR>(.*?)</TBODY>', re.DOTALL)
+# <TR align=right><TD align=middle><A href="http://193.190.240.226:14501">hub1.aprs2.net/193.190.240.226:20152</A></TD>
+# <TD align=middle>C1BEF0E2</TD>
+# <TD align=middle>Yes</TD>
+# <TD align=middle>aprsc 2.0.11&#8209;g6099cb1</TD>
+# <TD>5d14h00m45.881s</TD>
+# <TD>21,334,472</TD>
+# <TD>498,551</TD>
+# <TD>1,937,147,236</TD>
+# <TD>44,844,765</TD>
+# <TD>32,122</TD>
+# <TD>743</TD>
+# <TD>00.025s</TD>
+# <TD>4,048</TD>
+# <TD>0</TD></TR>
+javap3_re_outbound_line = re.compile('<TR[^>]*><TD[^>]*><A[^>]+>([^/<]+)/([^<]+)</A></TD><TD[^>]*>(.*?)</TD><TD[^>]*>(.*?)</TD><TD[^>]*>(.*?)</TD><TD[^>]*>(.*?)</TD><TD[^>]*>(.*?)</TD>(.*)')
 javap3_re_uptime = re.compile('(\\d+)(\\.\d+){0,1}([dhms])(.*)')
+
+def javap3_strfloat(s):
+    s = s.replace(',', '').replace('.', '').replace("'", '')
+    return float(s)
 
 class Poll:
     def __init__(self, log, server, software_type_cache, rates_cache):
@@ -255,14 +275,42 @@ class Poll:
             v = match.group(1)
             # javaprssrvr uses thousands separators based on current locale at server:
             # "78,527,080" *or* "78.527.080" or "78'527'080" !
-            v = v.replace(',', '').replace('.', '').replace("'", '')
-            self.properties[k] = float(v)
+            self.properties[k] = javap3_strfloat(v)
             #self.log.debug("%s: got %s: %r", self.id, k, self.properties[k])
         
         self.properties['uptime'] = self.javap3_decode_uptime(self.properties['uptime'])
         self.properties['user_load'] = float(self.properties['clients']) / float(min(self.client_cap, self.properties['clients_max'])) * 100.0
         self.properties['worst_load'] = self.properties['user_load']
         self.properties['type'] = 'javap3'
+        
+        #
+        # uplinks
+        #
+        
+        ups = javap3_re_outbound.search(d)
+        if ups != None:
+            #self.log.debug("found outbound: %r", ups.group(1))
+            s = ups.group(1)
+            upl = []
+            
+            while s:
+                m = javap3_re_outbound_line.search(s)
+                if not m:
+                    break
+                hname = m.group(1)
+                haddr = m.group(2)
+                uptime = self.javap3_decode_uptime(m.group(6))
+                rx_packets = javap3_strfloat(m.group(7))
+                self.log.debug("   server: host %s addr %s up %r rx %s", hname, haddr, uptime, rx_packets)
+                s = m.group(8)
+                #self.log.debug("   left: %s", s)
+                upl.append({
+                    'addr_rem': haddr,
+                    'up': uptime,
+                    'rx_packets': rx_packets
+                })
+            
+            self.properties['uplinks'] = upl
         
         return True
     
@@ -506,6 +554,21 @@ class Poll:
         
         self.properties['user_load'] = u_load
         self.properties['worst_load'] = worst_load
+        
+        #
+        # uplinks
+        #
+        j_uplinks = j.get('uplinks')
+        if j_uplinks != None:
+            upl = []
+            for u in j_uplinks:
+                upl.append({
+                    'id': u.get('username'),
+                    'addr_rem': u.get('addr_rem'),
+                    'up': u.get('since_connect'),
+                    'rx_packets': u.get('pkts_rx'),
+                })
+            self.properties['uplinks'] = upl
         
         return True
         
