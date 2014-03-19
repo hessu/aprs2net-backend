@@ -137,6 +137,9 @@ class Poll:
         if not self.service_tests():
             return False
         
+        if not self.check_uplink():
+            return False
+        
         self.properties['score'] = self.score.get(self.properties)
         self.properties['scorebase'] = self.score.score_components
         self.log.info("%s: Server OK, score %.1f: %r", self.id, self.properties['score'], self.score.score_components)
@@ -476,10 +479,18 @@ class Poll:
                 if callssid == None or up == None or up.text != "true" or ctime == None:
                     continue
                 
+                client_class_tag = cl.find("class")
+                if client_class_tag == None:
+                    continue
+                
+                client_class = client_class_tag.attrib.get("name")
+                if client_class != "UpstreamClientRcv":
+                    continue
+                
                 ctime = float(ctime.attrib.get("utc"))
                 uptime = (currtime - ctime) / 1000
                 
-                self.log.debug(" upstream client %s", callssid.text)
+                self.log.debug(" upstream client %s class %s", callssid.text, client_class)
                 
                 rem = "%s:%s" % (rem.text, rem.attrib.get('port', ''))
                 
@@ -681,7 +692,48 @@ class Poll:
                 
                 self.log.info("%s: HTTP submit 8080: return code %r - OK, looks like a submit port (%.3f s)", self.id, r.status_code, t_dur)
                 self.properties['submit-http-8080-' + ac] = t_dur
+    
+    def check_uplink(self):
+        """
+        Check that a server's uplink status is acceptable
+        """
+        
+        uplinks_required = True
+        member_of = self.server.get('member', [])
+        
+        if 'firenet.aprs2.net' in member_of:
+            self.log.debug("member of firenet.aprs2.net, not tracking uplinks")
+            return True
+            
+        if 'rotate.aprs2.net' in member_of:
+            self.log.debug("member of rotate.aprs2.net")
+            
+        if 'hubs.aprs2.net' in member_of:
+            self.log.debug("member of hubs.aprs2.net")
+            
+        if 'rotate.aprs.net' in member_of or 'cwop.aprs.net' in member_of:
+            self.log.debug("member of core or cwop, no need for uplinks")
+            uplinks_required = False
+            
+        ups = self.properties.get('uplinks', [])
+        
+        self.log.debug("uplinks: %r", ups)
+        
+        if uplinks_required == False:
+            if len(ups) == 0:
+                return True
                 
+            return self.error('uplinks-has', 'Server is linked to upstream servers - not expected for this server class')
+        
+        if len(ups) < 1:
+            return self.error('uplinks-none', 'Not connected to an upstream server')
+        
+        if len(ups) > 1:
+            return self.error('uplinks-many', 'Connected to more than 1 upstream server')
+        
+        upl = ups[0]
+        
+        return True
     
     def service_tests(self):
         """
