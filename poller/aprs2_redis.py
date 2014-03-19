@@ -10,6 +10,7 @@ import time
 import json
 
 kServer = 'aprs2.server'
+kAddressMap = 'aprs2.addrmap'
 kServerStatus = 'aprs2.serverstat'
 kServerLog = 'aprs2.serverlog'
 kPollQueue = 'aprs2.pollq'
@@ -30,6 +31,22 @@ class APRS2Redis:
         Store web UI config
         """
     	return self.red.set(kWebConfig, json.dumps(conf))
+    
+    def setAddressMap(self, map):
+        """
+        Store IP address => server ID map
+        """
+    	return self.red.set(kAddressMap, json.dumps(map))
+    
+    def getAddressMap(self):
+        """
+        Store IP address => server ID map
+        """
+    	d = self.red.get(kAddressMap)
+    	if d == None:
+    		return d
+    	
+    	return json.loads(d)
     
     def sendServerStatusMessage(self, msg):
         self.red.publish(kChannelStatus, json.dumps(msg))

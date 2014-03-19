@@ -175,6 +175,8 @@ class ConfigManager:
             self.red.storeRotate(rid, rotate)
         
         self.log.info("Saving servers...")
+        
+        addr_map = {}
         for id in uniqs:
             c = uniqs.get(id)
             id = id.upper()
@@ -182,7 +184,9 @@ class ConfigManager:
             c['id'] = id
             
             # We do not support IPv6-only servers for now.
-            if c.get('ipv4') == None:
+            ip4 = c.get('ipv4')
+            ip6 = c.get('ipv6')
+            if ip4 == None:
                self.log.info("Server has no IPv4 address: %s", id)
                self.red.delPollQ(id)
                self.red.delServer(id)
@@ -191,12 +195,17 @@ class ConfigManager:
             self.red.storeServer(c)
             polled[id] = 1
             
+            addr_map[ip4] = id
+            if ip6 != None:
+            	addr_map[ip6] = id
+            
             if self.red.getPollQ(id) == None:
                 self.log.info("Added new server: %s", id)
                 self.red.setPollQ(id, int(time.time()) + random.randint(0,20))
         
         # TODO: add sanity check for too few servers
         
+        self.red.setAddressMap(addr_map)
         self.log.info("Applied new server configuration")
         self.pollq_cleanup(polled)
     
