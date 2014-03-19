@@ -155,10 +155,10 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 	
 	/* Support for service status */
 	$scope.nets = [
-//		{ id: 'rotate.aprs.net', name: 'Core' },
+		{ id: 'rotate.aprs.net', name: 'Core' },
 		{ id: 'hubs.aprs2.net', name: 'T2 Hubs' },
 		{ id: 'rotate.aprs2.net', name: 'T2 Leafs' },
-//		{ id: 'cwop.aprs.net', name: 'CWOP' },
+		{ id: 'cwop.aprs.net', name: 'CWOP' },
 		{ id: 'firenet.aprs2.net', name: 'Firenet' }
 	];
 	
