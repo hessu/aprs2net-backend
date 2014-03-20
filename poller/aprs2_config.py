@@ -176,7 +176,10 @@ class ConfigManager:
         
         self.log.info("Saving servers...")
         
+        # collect a mapping from IP address to server ID, for later
+        # figuring out the id of an uplink server
         addr_map = {}
+        
         for id in uniqs:
             c = uniqs.get(id)
             id = id.upper()
