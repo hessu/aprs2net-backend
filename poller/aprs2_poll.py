@@ -784,7 +784,7 @@ class Poll:
         if required_upstream and required_upstream not in uplink_member:
             return self.error('uplinks-wrong', 'Connected to wrong upstream server')
         
-        self.info('Uplink: Connected to %s [%s]', upl.get('addr_rem'), upl.get('id'))
+        self.log.info('Uplink: Connected to %s [%s]', upl.get('addr_rem'), upl.get('id'))
         
         return True
     
