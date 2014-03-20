@@ -44,7 +44,7 @@ class APRS2Redis:
         """
     	d = self.red.get(kAddressMap)
     	if d == None:
-    		return d
+    	    return {}
     	
     	return json.loads(d)
     
