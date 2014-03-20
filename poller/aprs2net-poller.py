@@ -70,6 +70,9 @@ class Poller:
         self.software_type_cache = {}
         # cache for rate stats
         self.rates_cache = {}
+        
+        # IP address => server ID map
+        self.address_map = self.red.getAddressMap()
     
     def perform_poll(self, server):
         """
@@ -81,7 +84,7 @@ class Poller:
         log = aprs2_logbuf.PollingLog(self.log_poller)
         
         log.info("Poll thread started for %s", server['id'])
-        p = aprs2_poll.Poll(log, server, self.software_type_cache, self.rates_cache)
+        p = aprs2_poll.Poll(log, server, self.red, self.software_type_cache, self.rates_cache, self.address_map)
         success = False
         try:
             success = p.poll()

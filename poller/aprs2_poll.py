@@ -3,10 +3,12 @@ import time
 import requests
 import json
 import re
+import socket
 from lxml import etree
 
 import aprsis
 import aprs2_score
+import aprs2_redis
 
 # compile regular expressions to make them run faster
 javap3_re = {
@@ -18,11 +20,11 @@ javap3_re = {
 }
 
 javap3_re_num = {
-    # depending on server's system locale these integers have thousands separators, or not, either '.' or ',', "'"
+    # depending on server's system locale these integers have thousands separators, or not, either '.' or ',', "'", " "
     'clients': re.compile('<TD[^>]*>Current Inbound Connections</TD><TD>([\\d,\\.]+)</TD>'),
     'clients_max': re.compile('<TD[^>]*>Maximum Inbound Connections</TD><TD>([\\d,\\.]+)</TD>'),
-    'total_bytes_in': re.compile('<TD[^>]*>Total Bytes In</TD><TD>([\\d,\\.\']+)</TD>'),
-    'total_bytes_out': re.compile('<TD[^>]*>Total Bytes Out</TD><TD>([\\d,\\.\']+)</TD>'),
+    'total_bytes_in': re.compile('<TD[^>]*>Total Bytes In</TD><TD>([^<]+)</TD>'),
+    'total_bytes_out': re.compile('<TD[^>]*>Total Bytes Out</TD><TD>([^<]+)</TD>'),
 }
 
 javap3_re_outbound = re.compile('<TH[^>]*>Outbound Connections</TH>.*?<TR[^>]*>.*?</TR>(.*?)</TBODY>', re.DOTALL)
@@ -42,17 +44,31 @@ javap3_re_outbound = re.compile('<TH[^>]*>Outbound Connections</TH>.*?<TR[^>]*>.
 # <TD>0</TD></TR>
 javap3_re_outbound_line = re.compile('<TR[^>]*><TD[^>]*><A[^>]+>([^/<]+)/([^<]+)</A></TD><TD[^>]*>(.*?)</TD><TD[^>]*>(.*?)</TD><TD[^>]*>(.*?)</TD><TD[^>]*>(.*?)</TD><TD[^>]*>(.*?)</TD>(.*)')
 javap3_re_uptime = re.compile('(\\d+)(\\.\d+){0,1}([dhms])(.*)')
+javap3_re_numeric_sanitize = re.compile('[^\\d]+')
+
+re_ipv4_port = re.compile('(\\d+\\.\\d+\\.\\d+\\.\\d+):(\\d+)')
+re_ipv6_port = re.compile('([0-9a-f]+:[0-9a-f]+:[0-9a-f]+:[0-9a-f]+:[0-9a-f]+:[0-9a-f]+:[0-9a-f]+:[0-9a-f]+):(\\d+)')
 
 def javap3_strfloat(s):
-    s = s.replace(',', '').replace('.', '').replace("'", '')
+    # replace non-digits with empty strings
+    s = javap3_re_numeric_sanitize.sub('', s)
     return float(s)
 
+def inet6_normalize(addr_s):
+    try:
+        internal = socket.inet_pton(socket.AF_INET6, addr_s)
+        return socket.inet_ntop(socket.AF_INET6, internal)
+    except socket.error:
+        return None
+
 class Poll:
-    def __init__(self, log, server, software_type_cache, rates_cache):
+    def __init__(self, log, server, red, software_type_cache, rates_cache, address_map):
         self.log = log
         self.server = server
+        self.red = red
         self.software_type_cache = software_type_cache
         self.rates_cache = rates_cache
+        self.address_map = address_map
         self.id = server['id']
         self.status_url = 'http://%s:14501/' % self.server['ipv4']
         self.rhead = {'User-agent': 'aprs2net-poller/2.0'}
@@ -76,6 +92,24 @@ class Poll:
         self.log.info("%s: Polling error [%s]: %s", self.id, code, msg)
         self.errors.append([code, msg])
         return False
+    
+    def map_addr_id(self, addr):
+        """
+        Map server address to a server ID, if possible (for figuring out uplink)
+        """
+        
+        self.log.debug("mapping address to server: %r", addr)
+        
+        v4 = re_ipv4_port.match(addr)
+        if v4 != None:
+            return self.address_map.get(v4.group(1))
+        
+        v6 = re_ipv6_port.match(addr)
+        if v6 != None:
+            #self.log.debug("  v6 addr: %r", inet6_normalize(v6.group(1)))
+            return self.address_map.get(inet6_normalize(v6.group(1)))
+        
+        return "unknown"
     
     def poll(self):
         """
@@ -278,7 +312,10 @@ class Poll:
             v = match.group(1)
             # javaprssrvr uses thousands separators based on current locale at server:
             # "78,527,080" *or* "78.527.080" or "78'527'080" !
-            self.properties[k] = javap3_strfloat(v)
+            try:
+                self.properties[k] = javap3_strfloat(v)
+            except Exception:
+                return self.error('web-parse-fail', "javAPRSSrvr 3.x status page, numeric '%s' parsing failed" % k)
             #self.log.debug("%s: got %s: %r", self.id, k, self.properties[k])
         
         self.properties['uptime'] = self.javap3_decode_uptime(self.properties['uptime'])
@@ -304,10 +341,12 @@ class Poll:
                 haddr = m.group(2)
                 uptime = self.javap3_decode_uptime(m.group(6))
                 rx_packets = javap3_strfloat(m.group(7))
-                self.log.debug("   server: host %s addr %s up %r rx %s", hname, haddr, uptime, rx_packets)
+                id = self.map_addr_id(haddr)
+                self.log.debug("   server: host %s addr %s up %r rx %s id %r", hname, haddr, uptime, rx_packets, id)
                 s = m.group(8)
                 #self.log.debug("   left: %s", s)
                 upl.append({
+                    'id': id,
                     'addr_rem': haddr,
                     'up': uptime,
                     'rx_packets': rx_packets
@@ -699,6 +738,7 @@ class Poll:
         """
         
         uplinks_required = True
+        required_upstream = None
         member_of = self.server.get('member', [])
         
         if 'firenet.aprs2.net' in member_of:
@@ -707,9 +747,11 @@ class Poll:
             
         if 'rotate.aprs2.net' in member_of:
             self.log.debug("member of rotate.aprs2.net")
+            required_upstream = 'hubs.aprs2.net'
             
         if 'hubs.aprs2.net' in member_of:
             self.log.debug("member of hubs.aprs2.net")
+            required_upstream = 'rotate.aprs.net'
             
         if 'rotate.aprs.net' in member_of or 'cwop.aprs.net' in member_of:
             self.log.debug("member of core or cwop, no need for uplinks")
@@ -732,6 +774,17 @@ class Poll:
             return self.error('uplinks-many', 'Connected to more than 1 upstream server')
         
         upl = ups[0]
+        
+        uplink_server = self.red.getServer(upl.get('id'))
+        self.log.debug("uplink is: %r", uplink_server)
+        if uplink_server == None:
+            return self.error('uplinks-odd', 'Connected to unregistered upstream server')
+        
+        uplink_member = uplink_server.get('member', [])
+        if required_upstream and required_upstream not in uplink_member:
+            return self.error('uplinks-wrong', 'Connected to wrong upstream server')
+        
+        self.info('Uplink: Connected to %s [%s]', upl.get('addr_rem'), upl.get('id'))
         
         return True
     
