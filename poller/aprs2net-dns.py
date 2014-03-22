@@ -7,6 +7,7 @@ import ConfigParser
 import sys
 import traceback
 import types
+from urlparse import urlparse
 
 import requests
 import json
@@ -64,6 +65,7 @@ class DNSDriver:
         
         for url in self.pollers:
             self.log.info("Fetching status: %s", url)
+            siteid = urlparse(url).netloc
             
             t_start = time.time()
             
@@ -71,17 +73,17 @@ class DNSDriver:
                 r = requests.get('%sapi/full' % url, headers=self.rhead, timeout=self.http_timeout)
                 d = r.content
             except Exception as e:
-                self.log.error("%s: HTTP full JSON status fetch: Connection error: %s", url, str(e))
+                self.log.error("%s: HTTP full JSON status fetch: Connection error: %s", siteid, str(e))
                 continue
             
             if r.status_code != 200:
-                self.log.error("%s: HTTP full JSON status fetch: Status code %d", url, r.status_code)
+                self.log.error("%s: HTTP full JSON status fetch: Status code %d", siteid, r.status_code)
                 continue
             
             t_end = time.time()
             t_dur = t_end - t_start
             
-            self.log.debug("%s: HTTP GET /api/full returned: %r (%.3f s)", url, r.status_code, t_dur)
+            self.log.debug("%s: HTTP GET /api/full returned: %r (%.3f s)", siteid, r.status_code, t_dur)
             
             try:
                 j = json.loads(d)
@@ -89,7 +91,9 @@ class DNSDriver:
                 self.log.error("%s: JSON parsing failed: %r", url, e)
                 continue
             
-            self.check_returned_status(url, j, status_set)
+            self.check_returned_status(siteid, j, status_set)
+        
+        return status_set
     
     def check_returned_status(self, siteid, j, status_set):
         """
@@ -141,8 +145,51 @@ class DNSDriver:
         else:
             set = status_set[id] = {}
         
+        set[siteid] = stat
+    
+    def merge_status(self, status_set):
+        """
+        Merge status sets to produce final score for each server
+        """
         
+        merged = {}
         
+        for id in status_set:
+            ok_count = 0
+            scores = []
+            score_sum = 0
+            
+            for site in status_set[id]:
+                stat = status_set[id][site]
+                
+                self.log.debug("status for %s at %s: %r", id, site, stat)
+                
+                status = stat.get('status', 'Unknown')
+                if status == 'ok':
+                    ok_count += 1
+                
+                props = stat.get('props', {})
+                
+                if 'score' in props:
+                    scores.append(props['score'])
+                    score_sum += props['score']
+            
+            if ok_count == len(status_set[id]):
+                status = 'ok'
+            else:
+                status = 'fail'
+            
+            merged[id] = m = {
+                'status': status,
+            }
+            
+            # start off with arithmetic mean of scores
+            if len(scores) > 0:
+               m['score'] = score_sum / len(scores)
+            
+            self.log.debug("merged status for %s: %r", site, merged[id])
+                
+            return
     
     def poll(self):
         """
@@ -151,10 +198,10 @@ class DNSDriver:
         
         # Fetch full status JSON from all pollers, ignoring
         # pollers which appear to be faulty
-        self.fetch_full_status()
+        status_set = self.fetch_full_status()
         # Merge status JSONs, ignoring old polling results for individual servers,
         # figure out per-server "final score"
-        #self.merge_status()
+        merged_status = self.merge_status(status_set)
         # Push current DNS status to the master, if it has changed
         #self.update_dns()
     
