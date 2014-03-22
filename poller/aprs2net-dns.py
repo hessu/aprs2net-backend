@@ -12,6 +12,9 @@ from urlparse import urlparse
 import requests
 import json
 
+import aprs2_redis
+import aprs2_config
+
 # All configuration variables need to be strings originally.
 CONFIG_SECTION = 'dns'
 DEFAULT_CONF = {
@@ -47,6 +50,7 @@ class DNSDriver:
             
         self.config.read(config_file)
         
+        self.portal_base_url = self.config.get(CONFIG_SECTION, 'portal_base_url')
         self.dns_master = self.config.get(CONFIG_SECTION, 'dns_master')
         self.poll_interval = self.config.getint(CONFIG_SECTION, 'poll_interval')
         self.domains = self.config.get(CONFIG_SECTION, 'domains').split(',')
@@ -55,6 +59,10 @@ class DNSDriver:
         
         self.rhead = {'User-agent': 'aprs2net-dns/2.0'}
         self.http_timeout = 10.0
+        
+        # redis client
+        self.red = aprs2_redis.APRS2Redis(db=1)
+        self.config_manager = aprs2_config.ConfigManager(logging.getLogger('config'), self.red, self.portal_base_url)
     
     def fetch_full_status(self):
         """

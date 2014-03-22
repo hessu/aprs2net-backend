@@ -20,11 +20,11 @@ kWebConfig = 'aprs2.webconfig'
 kRotate = 'aprs2.rotate'
 
 class APRS2Redis:
-    def __init__(self, host='localhost', port=6379):
+    def __init__(self, host='localhost', port=6379, db=0):
         """
         aprs2.net status storage in Redis
         """
-        self.red = redis.Redis(host=host, port=port, db=0)
+        self.red = redis.Redis(host=host, port=port, db=db)
     
     def setWebConfig(self, conf):
         """
