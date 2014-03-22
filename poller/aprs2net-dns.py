@@ -162,7 +162,7 @@ class DNSDriver:
             for site in status_set[id]:
                 stat = status_set[id][site]
                 
-                self.log.debug("status for %s at %s: %r", id, site, stat)
+                #self.log.debug("status for %s at %s: %r", id, site, stat)
                 
                 status = stat.get('status', 'Unknown')
                 if status == 'ok':
@@ -181,15 +181,17 @@ class DNSDriver:
             
             merged[id] = m = {
                 'status': status,
+                'c_ok': ok_count,
+                'c_res': len(status_set[id])
             }
             
             # start off with arithmetic mean of scores
             if len(scores) > 0:
                m['score'] = score_sum / len(scores)
             
-            self.log.debug("merged status for %s: %r", site, merged[id])
-                
-            return
+            self.log.debug("merged status for %s: %r", id, merged[id])
+        
+        return merged
     
     def poll(self):
         """
