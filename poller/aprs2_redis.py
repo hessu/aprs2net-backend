@@ -163,5 +163,9 @@ class APRS2Redis:
     	if d == None:
     		return d
     	
-    	return json.loads(d)
+    	o = {}
+    	for k in d:
+    	   o[k] = json.loads(d[k])
+
+    	return o
     

@@ -121,6 +121,9 @@ class DNSDriver:
             self.log.error("%s: Full status JSON: servers is not a list", siteid)
             return
         
+        # TODO: Check that a good amount of servers in the set are OK,
+        # discard the whole set if the poller itself is in trouble
+        
         for s in servers:
             self.add_returned_server(siteid, s, status_set)
     
@@ -201,6 +204,23 @@ class DNSDriver:
         
         return merged
     
+    def update_dns(self, merged_status):
+        """
+        Update DNS to match the current merged status
+        """
+        
+        rotates = self.red.getRotates()
+        #self.log.debug("rotates: %r", rotates)
+        
+        for d in rotates:
+            self.update_dns_rotate(d, rotates[d])
+    
+    def update_dns_rotate(self, domain, config):
+        """
+        Update a single DNS rotate
+        """
+        self.log.debug("Checking rotate %s: %r", domain, config)
+    
     def poll(self):
         """
         Do a single polling round
@@ -213,7 +233,7 @@ class DNSDriver:
         # figure out per-server "final score"
         merged_status = self.merge_status(status_set)
         # Push current DNS status to the master, if it has changed
-        #self.update_dns()
+        self.update_dns(merged_status)
     
     def loop(self):
         """
