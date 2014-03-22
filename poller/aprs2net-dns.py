@@ -7,7 +7,8 @@ import ConfigParser
 import sys
 import traceback
 
-import aprs2_config
+import requests
+import json
 
 # All configuration variables need to be strings originally.
 CONFIG_SECTION = 'dns'
@@ -45,6 +46,61 @@ class DNSDriver:
         self.poll_interval = self.config.getint(CONFIG_SECTION, 'poll_interval')
         self.domains = self.config.get(CONFIG_SECTION, 'domains').split(',')
         self.pollers = self.config.get(CONFIG_SECTION, 'pollers').split(' ')
+        
+        self.rhead = {'User-agent': 'aprs2net-dns/2.0'}
+        self.http_timeout = 10.0
+    
+    def fetch_full_status(self):
+        """
+        Fetch full status from each of the masters
+        """
+        for url in self.pollers:
+            self.log.info("Fetching status: %s", url)
+            
+            t_start = time.time()
+            
+            try:
+                r = requests.get('%sapi/full' % url, headers=self.rhead, timeout=self.http_timeout)
+                d = r.content
+            except Exception as e:
+                self.log.error("%s: HTTP full JSON status fetch: Connection error: %s", url, str(e))
+            
+            if r.status_code != 200:
+                self.log.error("%s: HTTP full JSON status fetch: Status code %d", url, r.status_code)
+                continue
+            
+            t_end = time.time()
+            t_dur = t_end - t_start
+            
+            self.log.debug("%s: HTTP GET /api/full returned: %r", url, r.status_code)
+            
+            try:
+                j = json.loads(d)
+            except Exception as e:
+                self.log.error("%s: JSON parsing failed: %r", url, e)
+    
+    def poll(self):
+        """
+        Do a single polling round
+        """
+        
+        # Fetch full status JSON from all pollers, ignoring
+        # pollers which appear to be faulty
+        self.fetch_full_status()
+        # Merge status JSONs, ignoring old polling results for individual servers,
+        # figure out per-server "final score"
+        #self.merge_status()
+        # Push current DNS status to the master, if it has changed
+        #self.update_dns()
+    
+    def loop(self):
+        """
+        Main DNS driver loop
+        """
+        
+        while True:
+            self.poll()
+            time.sleep(self.poll_interval)
         
 driver = DNSDriver()
 driver.loop()
