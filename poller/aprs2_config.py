@@ -152,7 +152,7 @@ class ConfigManager:
         members = {}
         
         for rid in j:
-            self.log.debug("rotate %s", rid)
+            #self.log.debug("rotate %s", rid)
             
             rotate = j.get(rid)
             servers = rotate.get('servers')
@@ -161,7 +161,7 @@ class ConfigManager:
             members[rid] = []
             
             for id in servers:
-                self.log.debug("  server %s", id)
+                #self.log.debug("  server %s", id)
                 new = servers.get(id)
                 members[rid].append(id)
                 old = uniqs.get(id)
