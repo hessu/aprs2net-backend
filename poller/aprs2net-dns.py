@@ -31,7 +31,10 @@ DEFAULT_CONF = {
     'max_test_result_age': '300',
     
     # Portal URL for downloading configs
-    'portal_base_url': 'https://home.tomh.us:8001'
+    'portal_base_url': 'https://home.tomh.us:8001',
+    
+    # DNS TTL
+    'dns_ttl': '600',
 }
 
 class DNSDriver:
@@ -64,6 +67,7 @@ class DNSDriver:
         self.max_test_result_age = self.config.getint(CONFIG_SECTION, 'max_test_result_age')
         
         self.dns_keyring = dns.tsigkeyring.from_text({ 'aprs2net-dns.' : self.config.get(CONFIG_SECTION, 'dns_tsig_key') })
+        self.dns_ttl = self.config.getint(CONFIG_SECTION, 'dns_ttl')
 
         self.rhead = {'User-agent': 'aprs2net-dns/2.0'}
         self.http_timeout = 10.0
@@ -283,9 +287,9 @@ class DNSDriver:
         update.delete(fqdn, 'a')
         update.delete(fqdn, 'aaaa')
         for a in v4_addrs:
-            update.add(fqdn, 300, 'a', a.encode('ascii'))
+            update.add(fqdn, self.dns_ttl, 'a', a.encode('ascii'))
         for a in v6_addrs:
-            update.add(fqdn, 300, 'aaaa', a.encode('ascii'))
+            update.add(fqdn, self.dns_ttl, 'aaaa', a.encode('ascii'))
         
         try:
             response = dns.query.tcp(update, self.dns_master)
