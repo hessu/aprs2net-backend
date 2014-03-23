@@ -303,6 +303,11 @@ class DNSDriver:
         Push the addresses of individual servers to DNS
         """
         
+        # which FQDNs should go in DNS, and which addresses for them
+        names = {}
+        # Which FQDNs should go in DNS, with CNAME pointing to rotate
+        names_disabled = {}
+        
         for s in servers:
             serv = servers[s]
             #self.log.debug('Updating server %s: %r', s, serv)
@@ -311,17 +316,23 @@ class DNSDriver:
             fqdn = serv.get('host') + '.aprs2.net'
             
             if serv.get('disabled') == True:
-                self.dns_push(serv.get('id'), fqdn, cname=self.master_rotate)
+                names_disabled[fqdn] = 1
             else:
-                v4_addrs = []
-                v6_addrs = []
-                
-                if serv.get('ipv4'):
-                    v4_addrs.append(serv.get('ipv4'))
-                if serv.get('ipv6'):
-                    v6_addrs.append(serv.get('ipv6'))
+                if not fqdn in names:
+                    names[fqdn] = { 'v4': [], 'v6': [] }
                     
-                self.dns_push(serv.get('id'), fqdn, v4_addrs=v4_addrs, v6_addrs=v6_addrs)
+                if serv.get('ipv4'):
+                    names[fqdn]['v4'].append(serv.get('ipv4'))
+                if serv.get('ipv6'):
+                    names[fqdn]['v6'].append(serv.get('ipv6'))
+        
+        for fqdn in names:
+            self.dns_push(fqdn, fqdn, v4_addrs=names[fqdn]['v4'], v6_addrs=names[fqdn]['v6'])
+        
+        # Add CNAMEs to rotate, but only for names which did not get A records
+        for fqdn in names_disabled:
+            if fqdn not in names:
+                self.dns_push(fqdn, fqdn, cname=self.master_rotate)
         
     def dns_pick_zone(self, fqdn):
         """
