@@ -27,8 +27,9 @@ DEFAULT_CONF = {
     # Server polling interval
     'poll_interval': '60',
     
-    # Max test result age
     'max_test_result_age': '300',
+    'min_polled_servers': '80',
+    'min_polled_ok_pct': '55',
     
     # Portal URL for downloading configs
     'portal_base_url': 'https://home.tomh.us:8001',
@@ -65,6 +66,8 @@ class DNSDriver:
         self.master_rotate = self.config.get(CONFIG_SECTION, 'master_rotate')
         self.pollers = self.config.get(CONFIG_SECTION, 'pollers').split(' ')
         self.max_test_result_age = self.config.getint(CONFIG_SECTION, 'max_test_result_age')
+        self.min_polled_servers = self.config.getint(CONFIG_SECTION, 'min_polled_servers')
+        self.min_polled_ok_pct = self.config.getint(CONFIG_SECTION, 'min_polled_ok_pct')
         
         self.dns_keyring = dns.tsigkeyring.from_text({ 'aprs2net-dns.' : self.config.get(CONFIG_SECTION, 'dns_tsig_key') })
         self.dns_ttl = self.config.getint(CONFIG_SECTION, 'dns_ttl')
@@ -133,8 +136,20 @@ class DNSDriver:
             self.log.error("%s: Full status JSON: servers is not a list", siteid)
             return
         
-        # TODO: Check that a good amount of servers in the set are OK,
-        # discard the whole set if the poller itself is in trouble
+        if len(servers) < self.min_polled_servers:
+            self.log.error("%s: %d servers polled - too few (min %d)!", siteid, len(servers), self.min_polled_servers)
+            return
+        
+        # Check that a good amount of servers in the set are OK,
+        # discard the whole set if the poller itself is in trouble.
+        servers_ok = [s for s in servers if s.get('status') and s.get('status').get('status') == 'ok']
+        servers_ok_pct = 100.0 * len(servers_ok) / len(servers)
+        self.log.info("%s: %d/%d (%.1f %%) servers OK", siteid, len(servers_ok), len(servers), servers_ok_pct)
+        
+        if servers_ok_pct < self.min_polled_ok_pct:
+            self.log.error("%s: Too few servers OK (%d/%d: %.1f %% < %.0f %%) - poller having trouble?",
+                siteid, len(servers_ok), len(servers), servers_ok_pct, self.min_polled_ok_pct)
+            return
         
         for s in servers:
             self.add_returned_server(siteid, s, status_set)
