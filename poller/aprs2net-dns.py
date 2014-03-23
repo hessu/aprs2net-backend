@@ -61,7 +61,7 @@ class DNSDriver:
         self.portal_base_url = self.config.get(CONFIG_SECTION, 'portal_base_url')
         self.dns_master = self.config.get(CONFIG_SECTION, 'dns_master')
         self.poll_interval = self.config.getint(CONFIG_SECTION, 'poll_interval')
-        self.domains = self.config.get(CONFIG_SECTION, 'domains').split(',')
+        self.dns_zones = self.config.get(CONFIG_SECTION, 'dns_zones').split(' ')
         self.master_rotate = self.config.get(CONFIG_SECTION, 'master_rotate')
         self.pollers = self.config.get(CONFIG_SECTION, 'pollers').split(' ')
         self.max_test_result_age = self.config.getint(CONFIG_SECTION, 'max_test_result_age')
@@ -276,16 +276,31 @@ class DNSDriver:
         self.dns_push(domain, v4_addrs, v6_addrs)
         #self.log.info("VERDICT %s: No working servers, CNAME %s", domain, self.master_rotate)
     
+    def dns_pick_zone(self, fqdn):
+        """
+        Figure out which zone to update, based on FQDN
+        """
+        
+        for z in self.dns_zones:
+            if fqdn.endswith('.' + z):
+                return z
+        
+        return None
+    
     def dns_push(self, fqdn, v4_addrs, v6_addrs):
         """
         Push a set of A and AAAA records to the DNS
         """
         
+        zone = self.dns_pick_zone(fqdn)
+        if zone == None:
+            self.log.info("DNS push: %s is not in a managed zone, not updating", fqdn)
+            return
+        
         fqdn = fqdn + '.'
         
-        update = dns.update.Update('aprs2.net', keyring=self.dns_keyring, keyalgorithm="hmac-sha256")
-        update.delete(fqdn, 'a')
-        update.delete(fqdn, 'aaaa')
+        update = dns.update.Update(zone, keyring=self.dns_keyring, keyalgorithm="hmac-sha256")
+        update.delete(fqdn)
         for a in v4_addrs:
             update.add(fqdn, self.dns_ttl, 'a', a.encode('ascii'))
         for a in v6_addrs:
@@ -303,7 +318,7 @@ class DNSDriver:
             self.log.error("DNS update error: %r", e)
             return
             
-        self.log.debug("Sent update, response: %r", response)
+        self.log.debug("Sent update for %s: %s - response: %r", zone, fqdn, response)
     
     def poll(self):
         """
