@@ -75,6 +75,9 @@ class DNSDriver:
         self.rhead = {'User-agent': 'aprs2net-dns/2.0'}
         self.http_timeout = 10.0
         
+        # cache DNS state for each name, to prevent updates which do not change anything
+        self.dns_update_cache = {}
+        
         # redis client
         self.red = aprs2_redis.APRS2Redis(db=1)
         self.config_manager = aprs2_config.ConfigManager(logging.getLogger('config'), self.red, self.portal_base_url)
@@ -308,7 +311,21 @@ class DNSDriver:
         """
         Push a set of A and AAAA records to the DNS
         """
+        # check if there are any changes
+        v4_addrs = sorted(v4_addrs)
+        v6_addrs = sorted(v6_addrs)
+        if cname:
+            cache_key = "CNAME cname"
+        else:
+            cache_key = ','.join(v4_addrs) + ' ' + ','.join(v6_addrs)
         
+        if self.dns_update_cache.get(fqdn) == cache_key:
+            self.log.info("DNS push: %s - no changes", fqdn)
+            return
+            
+        self.dns_update_cache[fqdn] = cache_key
+        
+        # look up the zone file to update
         zone = self.dns_pick_zone(fqdn)
         if zone == None:
             self.log.info("DNS push: %s is not in a managed zone, not updating", fqdn)
@@ -316,6 +333,8 @@ class DNSDriver:
         
         # add a dot to make sure bind doesn't add the zone name in the end
         fqdn = fqdn + '.'
+        
+        self.log.info("DNS push: %s: %s", fqdn, cache_key)
         
         update = dns.update.Update(zone, keyring=self.dns_keyring, keyalgorithm="hmac-sha256")
         update.delete(fqdn)
@@ -339,7 +358,10 @@ class DNSDriver:
             self.log.error("DNS update error: %r", e)
             return
             
-        self.log.debug("Sent update for %s: %s - response: %r", zone, fqdn, response)
+        self.log.info("Sent update for %s: %s - response: %s / %s", zone, fqdn,
+            dns.opcode.to_text(dns.opcode.from_flags(response.flags)),
+            dns.rcode.to_text(dns.rcode.from_flags(response.flags, response.ednsflags))
+            )
     
     def poll(self):
         """
