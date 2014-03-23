@@ -7,6 +7,7 @@ import ConfigParser
 import sys
 import traceback
 import types
+import socket
 from urlparse import urlparse
 
 import requests
@@ -14,6 +15,11 @@ import json
 
 import aprs2_redis
 import aprs2_config
+
+# dnspython.org
+import dns.query
+import dns.tsigkeyring
+import dns.update
 
 # All configuration variables need to be strings originally.
 CONFIG_SECTION = 'dns'
@@ -57,6 +63,8 @@ class DNSDriver:
         self.pollers = self.config.get(CONFIG_SECTION, 'pollers').split(' ')
         self.max_test_result_age = self.config.getint(CONFIG_SECTION, 'max_test_result_age')
         
+        self.dns_keyring = dns.tsigkeyring.from_text({ 'aprs2net-dns.' : self.config.get(CONFIG_SECTION, 'dns_tsig_key') })
+
         self.rhead = {'User-agent': 'aprs2net-dns/2.0'}
         self.http_timeout = 10.0
         
@@ -240,7 +248,7 @@ class DNSDriver:
         scored_order_v6 = sorted(members_ok_v6, key=lambda x:status.get(x).get('score'))
         
         # Limit the sizes of rotates.
-        # The DNS reply packet needs to be < 512 bytes, since there are still
+        # The DNS reply packet needs to be <= 512 bytes, since there are still
         # broken resolvers out there, which don't do EDNS or TCP.
         scored_order_v4 = scored_order_v4[0:8]
         scored_order_v6 = scored_order_v6[0:3]
@@ -254,9 +262,44 @@ class DNSDriver:
                 return
             
             self.log.info("VERDICT %s: No working servers, CNAME %s", domain, self.master_rotate)
+            #self.dns_push(domain, 'CNAME', self.master_rotate)
             return
         
+        # Addresses to use
+        v4_addrs = [servers.get(i).get('ipv4') for i in scored_order_v4]
+        v6_addrs = [servers.get(i).get('ipv6') for i in scored_order_v6]
+        
+        self.dns_push(domain, v4_addrs, v6_addrs)
         #self.log.info("VERDICT %s: No working servers, CNAME %s", domain, self.master_rotate)
+    
+    def dns_push(self, fqdn, v4_addrs, v6_addrs):
+        """
+        Push a set of A and AAAA records to the DNS
+        """
+        
+        fqdn = fqdn + '.'
+        
+        update = dns.update.Update('aprs2.net', keyring=self.dns_keyring, keyalgorithm="hmac-sha256")
+        update.delete(fqdn, 'a')
+        update.delete(fqdn, 'aaaa')
+        for a in v4_addrs:
+            update.add(fqdn, 300, 'a', a.encode('ascii'))
+        for a in v6_addrs:
+            update.add(fqdn, 300, 'aaaa', a.encode('ascii'))
+        
+        try:
+            response = dns.query.tcp(update, self.dns_master)
+        except socket.error as e:
+            self.log.error("DNS update error, cannot connect to DNS master: %r", e)
+            return
+        except dns.tsig.PeerBadKey as e:
+            self.log.error("DNS update error, DNS master does not accept our key: %r", e)
+            return
+        except Exception as e:
+            self.log.error("DNS update error: %r", e)
+            return
+            
+        self.log.debug("Sent update, response: %r", response)
     
     def poll(self):
         """
@@ -266,9 +309,11 @@ class DNSDriver:
         # Fetch full status JSON from all pollers, ignoring
         # pollers which appear to be faulty
         status_set = self.fetch_full_status()
+        
         # Merge status JSONs, ignoring old polling results for individual servers,
         # figure out per-server "final score"
         merged_status = self.merge_status(status_set)
+        
         # Push current DNS status to the master, if it has changed
         self.update_dns(merged_status)
     
