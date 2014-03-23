@@ -146,6 +146,7 @@ class DNSDriver:
             self.log.error("%s: Server in set, with id or last_test missing", siteid)
             return
         
+        # the testing result must be quite recent to be useful
         test_age = time.time() - last_test
         if test_age > self.max_test_result_age:
             self.log.error("%s: [%s] test age %.0f > %.0f", siteid, id, test_age, self.max_test_result_age)
@@ -196,7 +197,8 @@ class DNSDriver:
                 'c_res': len(status_set[id])
             }
             
-            # start off with arithmetic mean of scores
+            # start off with arithmetic mean of scores... later, figure out
+            # something more sensible
             if len(scores) > 0:
                m['score'] = score_sum / len(scores)
             
@@ -209,6 +211,7 @@ class DNSDriver:
         Update DNS to match the current merged status
         """
         
+        # Fetch setup from database (maintaned by config manager thread)
         rotates = self.red.getRotates()
         servers = self.red.getServers()
         
