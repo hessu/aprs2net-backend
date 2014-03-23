@@ -249,6 +249,9 @@ class DNSDriver:
         
         for d in rotates:
             self.update_dns_rotate(d, rotates[d], merged_status, servers)
+        
+        # Push the addresses of individual servers
+        self.update_dns_hosts(servers, merged_status)
     
     def update_dns_rotate(self, domain, domain_conf, status, servers):
         """
@@ -296,6 +299,31 @@ class DNSDriver:
         self.dns_push(domain, v4_addrs=v4_addrs, v6_addrs=v6_addrs)
         #self.log.info("VERDICT %s: No working servers, CNAME %s", domain, self.master_rotate)
     
+    def update_dns_hosts(self, servers, merged_status):
+        """
+        Push the addresses of individual servers to DNS
+        """
+        
+        for s in servers:
+            serv = servers[s]
+            #self.log.debug('Updating server %s: %r', s, serv)
+            
+            # TODO - use correct domain part!
+            fqdn = serv.get('host') + '.aprs2.net'
+            
+            if serv.get('disabled') == True:
+                self.dns_push(fqdn, cname=self.master_rotate)
+            else:
+                v4_addrs = []
+                v6_addrs = []
+                
+                if serv.get('ipv4'):
+                    v4_addrs.append(serv.get('ipv4'))
+                if serv.get('ipv6'):
+                    v6_addrs.append(serv.get('ipv6'))
+                    
+                self.dns_push(fqdn, v4_addrs=v4_addrs, v6_addrs=v6_addrs)
+        
     def dns_pick_zone(self, fqdn):
         """
         Figure out which zone to update, based on FQDN
@@ -320,7 +348,7 @@ class DNSDriver:
             cache_key = ','.join(v4_addrs) + ' ' + ','.join(v6_addrs)
         
         if self.dns_update_cache.get(fqdn) == cache_key:
-            self.log.info("DNS push: %s - no changes", fqdn)
+            #self.log.info("DNS push: %s - no changes", fqdn)
             return
             
         self.dns_update_cache[fqdn] = cache_key
