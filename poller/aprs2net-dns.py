@@ -53,6 +53,7 @@ class DNSDriver:
         self.dns_master = self.config.get(CONFIG_SECTION, 'dns_master')
         self.poll_interval = self.config.getint(CONFIG_SECTION, 'poll_interval')
         self.domains = self.config.get(CONFIG_SECTION, 'domains').split(',')
+        self.master_rotate = self.config.get(CONFIG_SECTION, 'master_rotate')
         self.pollers = self.config.get(CONFIG_SECTION, 'pollers').split(' ')
         self.max_test_result_age = self.config.getint(CONFIG_SECTION, 'max_test_result_age')
         
@@ -209,26 +210,50 @@ class DNSDriver:
         """
         
         rotates = self.red.getRotates()
-        #self.log.debug("rotates: %r", rotates)
+        servers = self.red.getServers()
         
         for d in rotates:
-            self.update_dns_rotate(d, rotates[d], merged_status)
+            self.update_dns_rotate(d, rotates[d], merged_status, servers)
     
-    def update_dns_rotate(self, domain, config, status):
+    def update_dns_rotate(self, domain, domain_conf, status, servers):
         """
         Update a single DNS rotate
         """
-        self.log.debug("Checking rotate %s: %r", domain, config)
+        self.log.info("Processing rotate %s ...", domain)
+        #self.log.debug("Checking rotate %s: %r", domain, domain_conf)
         
-        members = config.get('members')
-        members_ok = [i for i in members if status.get(i) and status.get(i).get('status') == 'ok' and status.get(i).get('score') != None]
+        # which members are OK, and which of them have IPv4 or IPv6 addresses available
+        members = domain_conf.get('members')
+        members_ok = [i for i in members if status.get(i) and status.get(i).get('status') == 'ok' and status.get(i).get('score') != None and servers.get(i)]
+        members_ok_v4 = [i for i in members_ok if servers.get(i).get('ipv4')]
+        members_ok_v6 = [i for i in members_ok if servers.get(i).get('ipv6')]
+        
         self.log.debug("Members: %r", members)
-        self.log.debug("Members ok: %r", members_ok)
+        self.log.debug("Members ok ip4: %r", members_ok_v4)
+        self.log.debug("Members ok ip6: %r", members_ok_v6)
         
-        scored_order = sorted(members_ok, key=lambda x:status.get(x).get('score'))
-        self.log.debug("Scored order: %r", [(i, '%.1f' % status.get(i).get('score')) for i in scored_order])
+        # sort by score
+        scored_order_v4 = sorted(members_ok_v4, key=lambda x:status.get(x).get('score'))
+        scored_order_v6 = sorted(members_ok_v6, key=lambda x:status.get(x).get('score'))
         
+        # Limit the sizes of rotates.
+        # The DNS reply packet needs to be < 512 bytes, since there are still
+        # broken resolvers out there, which don't do EDNS or TCP.
+        scored_order_v4 = scored_order_v4[0:8]
+        scored_order_v6 = scored_order_v6[0:3]
         
+        self.log.info("Scored order ip4: %r", [(i, '%.1f' % status.get(i).get('score')) for i in scored_order_v4])
+        self.log.info("Scored order ip6: %r", [(i, '%.1f' % status.get(i).get('score')) for i in scored_order_v6])
+        
+        if len(scored_order_v4) < 1:
+            if domain == self.master_rotate:
+                self.log.error("Ouch! Master rotate %s has no working servers - not doing anything!", self.master_rotate)
+                return
+            
+            self.log.info("VERDICT %s: No working servers, CNAME %s", domain, self.master_rotate)
+            return
+        
+        #self.log.info("VERDICT %s: No working servers, CNAME %s", domain, self.master_rotate)
     
     def poll(self):
         """

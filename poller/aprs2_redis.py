@@ -89,9 +89,24 @@ class APRS2Redis:
     	
     	d = self.red.hget(kServer, id)
     	if d == None:
-    		return d
+    	    return d
     	
     	return json.loads(d)
+    
+    def getServers(self):
+    	"""
+    	Get all server configurations
+    	"""
+    	
+    	d = self.red.hgetall(kServer)
+    	if d == None:
+    		return d
+    	
+    	o = {}
+    	for k in d:
+    	    o[k] = json.loads(d[k])
+    	
+    	return o
     
     def storeServerLog(self, id, logEntry):
     	"""
