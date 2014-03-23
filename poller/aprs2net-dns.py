@@ -196,7 +196,7 @@ class DNSDriver:
         for id in status_set:
             ok_count = 0
             scores = []
-            score_sum = 0
+            score_sum = 0.0
             
             for site in status_set[id]:
                 stat = status_set[id][site]
@@ -206,6 +206,8 @@ class DNSDriver:
                 status = stat.get('status', 'Unknown')
                 if status == 'ok':
                     ok_count += 1
+                else:
+                    score_sum += 1000.0
                 
                 props = stat.get('props', {})
                 
@@ -213,7 +215,7 @@ class DNSDriver:
                     scores.append(props['score'])
                     score_sum += props['score']
             
-            if ok_count == len(status_set[id]):
+            if ok_count >= 1 and float(ok_count) / len(status_set[id]) > 0.48:
                 status = 'ok'
             else:
                 status = 'fail'
