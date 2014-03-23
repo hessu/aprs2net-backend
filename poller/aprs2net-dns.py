@@ -266,14 +266,14 @@ class DNSDriver:
                 return
             
             self.log.info("VERDICT %s: No working servers, CNAME %s", domain, self.master_rotate)
-            #self.dns_push(domain, 'CNAME', self.master_rotate)
+            self.dns_push(domain, cname=self.master_rotate)
             return
         
         # Addresses to use
         v4_addrs = [servers.get(i).get('ipv4') for i in scored_order_v4]
         v6_addrs = [servers.get(i).get('ipv6') for i in scored_order_v6]
         
-        self.dns_push(domain, v4_addrs, v6_addrs)
+        self.dns_push(domain, v4_addrs=v4_addrs, v6_addrs=v6_addrs)
         #self.log.info("VERDICT %s: No working servers, CNAME %s", domain, self.master_rotate)
     
     def dns_pick_zone(self, fqdn):
@@ -287,7 +287,7 @@ class DNSDriver:
         
         return None
     
-    def dns_push(self, fqdn, v4_addrs, v6_addrs):
+    def dns_push(self, fqdn, v4_addrs = [], v6_addrs = [], cname = None):
         """
         Push a set of A and AAAA records to the DNS
         """
@@ -297,14 +297,18 @@ class DNSDriver:
             self.log.info("DNS push: %s is not in a managed zone, not updating", fqdn)
             return
         
+        # add a dot to make sure bind doesn't add the zone name in the end
         fqdn = fqdn + '.'
         
         update = dns.update.Update(zone, keyring=self.dns_keyring, keyalgorithm="hmac-sha256")
         update.delete(fqdn)
-        for a in v4_addrs:
-            update.add(fqdn, self.dns_ttl, 'a', a.encode('ascii'))
-        for a in v6_addrs:
-            update.add(fqdn, self.dns_ttl, 'aaaa', a.encode('ascii'))
+        if cname:
+            update.add(fqdn, self.dns_ttl, 'cname', cname + '.')
+        else:
+            for a in v4_addrs:
+                update.add(fqdn, self.dns_ttl, 'a', a.encode('ascii'))
+            for a in v6_addrs:
+                update.add(fqdn, self.dns_ttl, 'aaaa', a.encode('ascii'))
         
         try:
             response = dns.query.tcp(update, self.dns_master)
