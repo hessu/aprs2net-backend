@@ -289,15 +289,14 @@ class DNSDriver:
                 return
             
             self.log.info("VERDICT %s: No working servers, CNAME %s", domain, self.master_rotate)
-            self.dns_push(domain, cname=self.master_rotate)
+            self.dns_push(domain, domain, cname=self.master_rotate)
             return
         
         # Addresses to use
         v4_addrs = [servers.get(i).get('ipv4') for i in scored_order_v4]
         v6_addrs = [servers.get(i).get('ipv6') for i in scored_order_v6]
         
-        self.dns_push(domain, v4_addrs=v4_addrs, v6_addrs=v6_addrs)
-        #self.log.info("VERDICT %s: No working servers, CNAME %s", domain, self.master_rotate)
+        self.dns_push(domain, domain, v4_addrs=v4_addrs, v6_addrs=v6_addrs)
     
     def update_dns_hosts(self, servers, merged_status):
         """
@@ -312,7 +311,7 @@ class DNSDriver:
             fqdn = serv.get('host') + '.aprs2.net'
             
             if serv.get('disabled') == True:
-                self.dns_push(fqdn, cname=self.master_rotate)
+                self.dns_push(serv.get('id'), fqdn, cname=self.master_rotate)
             else:
                 v4_addrs = []
                 v6_addrs = []
@@ -322,7 +321,7 @@ class DNSDriver:
                 if serv.get('ipv6'):
                     v6_addrs.append(serv.get('ipv6'))
                     
-                self.dns_push(fqdn, v4_addrs=v4_addrs, v6_addrs=v6_addrs)
+                self.dns_push(serv.get('id'), fqdn, v4_addrs=v4_addrs, v6_addrs=v6_addrs)
         
     def dns_pick_zone(self, fqdn):
         """
@@ -335,20 +334,20 @@ class DNSDriver:
         
         return None
     
-    def dns_push(self, fqdn, v4_addrs = [], v6_addrs = [], cname = None):
+    def dns_push(self, logid, fqdn, v4_addrs = [], v6_addrs = [], cname = None):
         """
         Push a set of A and AAAA records to the DNS
         """
         # check if there are any changes
         v4_addrs = sorted(v4_addrs)
         v6_addrs = sorted(v6_addrs)
-        if cname:
-            cache_key = "CNAME cname"
+        if cname != None:
+            cache_key = "CNAME " + cname
         else:
             cache_key = ','.join(v4_addrs) + ' ' + ','.join(v6_addrs)
         
         if self.dns_update_cache.get(fqdn) == cache_key:
-            #self.log.info("DNS push: %s - no changes", fqdn)
+            #self.log.info("DNS push [%s]: %s - no changes", logid, fqdn)
             return
             
         self.dns_update_cache[fqdn] = cache_key
@@ -356,17 +355,17 @@ class DNSDriver:
         # look up the zone file to update
         zone = self.dns_pick_zone(fqdn)
         if zone == None:
-            self.log.info("DNS push: %s is not in a managed zone, not updating", fqdn)
+            self.log.info("DNS push [%s]: %s is not in a managed zone, not updating", logid, fqdn)
             return
         
         # add a dot to make sure bind doesn't add the zone name in the end
         fqdn = fqdn + '.'
         
-        self.log.info("DNS push: %s: %s", fqdn, cache_key)
+        self.log.info("DNS pushing [%s]: %s: %s", logid, fqdn, cache_key)
         
         update = dns.update.Update(zone, keyring=self.dns_keyring, keyalgorithm="hmac-sha256")
         update.delete(fqdn)
-        if cname:
+        if cname != None:
             update.add(fqdn, self.dns_ttl, 'cname', cname + '.')
         else:
             for a in v4_addrs:
@@ -377,16 +376,16 @@ class DNSDriver:
         try:
             response = dns.query.tcp(update, self.dns_master)
         except socket.error as e:
-            self.log.error("DNS update error, cannot connect to DNS master: %r", e)
+            self.log.error("DNS push [%s]: update error, cannot connect to DNS master: %r", logid, e)
             return
         except dns.tsig.PeerBadKey as e:
-            self.log.error("DNS update error, DNS master does not accept our key: %r", e)
+            self.log.error("DNS push [%s]: update error, DNS master does not accept our key: %r", logid, e)
             return
         except Exception as e:
-            self.log.error("DNS update error: %r", e)
+            self.log.error("DNS push [%s]: update error: %r", logid, e)
             return
             
-        self.log.info("Sent update for %s: %s - response: %s / %s", zone, fqdn,
+        self.log.info("DNS push [%s]: Sent %s: %s - response: %s / %s", logid, zone, fqdn,
             dns.opcode.to_text(dns.opcode.from_flags(response.flags)),
             dns.rcode.to_text(dns.rcode.from_flags(response.flags, response.ednsflags))
             )
