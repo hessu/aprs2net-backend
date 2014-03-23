@@ -37,9 +37,8 @@ class DNSDriver:
         logging.config.fileConfig(config_file)
         logging.Formatter.converter = time.gmtime
         
-        self.log = logging.getLogger('main')
+        self.log = logging.getLogger('dns')
         self.log.info("Starting up")
-        self.log_poller = logging.getLogger('dns')
         
         # read configuration
         self.config = ConfigParser.ConfigParser()
@@ -213,13 +212,23 @@ class DNSDriver:
         #self.log.debug("rotates: %r", rotates)
         
         for d in rotates:
-            self.update_dns_rotate(d, rotates[d])
+            self.update_dns_rotate(d, rotates[d], merged_status)
     
-    def update_dns_rotate(self, domain, config):
+    def update_dns_rotate(self, domain, config, status):
         """
         Update a single DNS rotate
         """
         self.log.debug("Checking rotate %s: %r", domain, config)
+        
+        members = config.get('members')
+        members_ok = [i for i in members if status.get(i) and status.get(i).get('status') == 'ok' and status.get(i).get('score') != None]
+        self.log.debug("Members: %r", members)
+        self.log.debug("Members ok: %r", members_ok)
+        
+        scored_order = sorted(members_ok, key=lambda x:status.get(x).get('score'))
+        self.log.debug("Scored order: %r", [(i, '%.1f' % status.get(i).get('score')) for i in scored_order])
+        
+        
     
     def poll(self):
         """
