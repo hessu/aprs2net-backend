@@ -202,9 +202,13 @@ class ConfigManager:
             if ip6 != None:
             	addr_map[ip6] = id
             
-            if self.red.getPollQ(id) == None:
-                self.log.info("Added new server: %s", id)
-                self.red.setPollQ(id, int(time.time()) + random.randint(0,20))
+            if c.get('deleted'):
+                self.log.info("Server is marked as deleted, removing from poll queue: %s", id)
+                self.red.delPollQ(id)
+            else:
+                if self.red.getPollQ(id) == None:
+                    self.log.info("Adding server in poll queue: %s", id)
+                    self.red.setPollQ(id, int(time.time()) + random.randint(0,20))
         
         # TODO: add sanity check for too few servers
         

@@ -148,11 +148,11 @@ class Poller:
         while to_poll and self.threads_now < self.threads_max:
             i = to_poll.pop(0)
             server = self.red.getServer(i)
-            if server:
+            if server and not server.get('deleted'):
                 self.red.setPollQ(i, int(time.time()) + self.poll_interval)
                 self.poll(server)
             else:
-                self.log.info("Server %s has been deleted, removing from queue.", i)
+                self.log.info("Server %s has been removed, removing from queue.", i)
                 self.red.delPollQ(i)
     
     def loop_reap_old_threads(self):

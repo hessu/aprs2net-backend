@@ -262,7 +262,10 @@ class DNSDriver:
         
         # which members are OK, and which of them have IPv4 or IPv6 addresses available
         members = domain_conf.get('members')
-        members_ok = [i for i in members if status.get(i) and status.get(i).get('status') == 'ok' and status.get(i).get('score') != None and servers.get(i)]
+        members_ok = [i for i in members if status.get(i)
+            and status.get(i).get('status') == 'ok' and status.get(i).get('score') != None
+            and servers.get(i) and servers.get(i).get('out_of_service') != True
+            and servers.get(i).get('deleted') != True]
         members_ok_v4 = [i for i in members_ok if servers.get(i).get('ipv4')]
         members_ok_v6 = [i for i in members_ok if servers.get(i).get('ipv6')]
         
@@ -306,7 +309,7 @@ class DNSDriver:
         # which FQDNs should go in DNS, and which addresses for them
         names = {}
         # Which FQDNs should go in DNS, with CNAME pointing to rotate
-        names_disabled = {}
+        names_cnamed = {}
         
         for s in servers:
             serv = servers[s]
@@ -315,8 +318,8 @@ class DNSDriver:
             # TODO - use correct domain part!
             fqdn = serv.get('host') + '.aprs2.net'
             
-            if serv.get('disabled') == True:
-                names_disabled[fqdn] = 1
+            if serv.get('deleted') == True:
+                names_cnamed[fqdn] = 1
             else:
                 if not fqdn in names:
                     names[fqdn] = { 'v4': [], 'v6': [] }
@@ -330,7 +333,7 @@ class DNSDriver:
             self.dns_push(fqdn, fqdn, v4_addrs=names[fqdn]['v4'], v6_addrs=names[fqdn]['v6'])
         
         # Add CNAMEs to rotate, but only for names which did not get A records
-        for fqdn in names_disabled:
+        for fqdn in names_cnamed:
             if fqdn not in names:
                 self.dns_push(fqdn, fqdn, cname=self.master_rotate)
         
@@ -355,7 +358,7 @@ class DNSDriver:
         if cname != None:
             cache_key = "CNAME " + cname
         else:
-            cache_key = ','.join(v4_addrs) + ' ' + ','.join(v6_addrs)
+            cache_key = ' '.join(v4_addrs) + ' ' + ' '.join(v6_addrs)
         
         if self.dns_update_cache.get(fqdn) == cache_key:
             #self.log.info("DNS push [%s]: %s - no changes", logid, fqdn)
