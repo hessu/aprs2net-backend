@@ -27,7 +27,7 @@ DEFAULT_CONF = {
     # Server polling interval
     'poll_interval': '60',
     
-    'max_test_result_age': '300',
+    'max_test_result_age': '660',
     'min_polled_servers': '80',
     'min_polled_ok_pct': '55',
     
