@@ -318,7 +318,7 @@ class DNSDriver:
             # TODO - use correct domain part!
             fqdn = serv.get('host') + '.aprs2.net'
             
-            if serv.get('deleted') == True:
+            if serv.get('out_of_service') or serv.get('deleted'):
                 names_cnamed[fqdn] = 1
             else:
                 if not fqdn in names:
