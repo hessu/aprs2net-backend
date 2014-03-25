@@ -368,11 +368,13 @@ class DNSDriver:
         """
         Push a set of A and AAAA records to the DNS
         """
-        # check if there are any changes
+        # check if there are any changes, sort the addresses first so that
+        # scoring order changes do not cause cache misses
         v4_addrs = sorted(v4_addrs)
         v6_addrs = sorted(v6_addrs)
         if cname != None:
             cache_key = "CNAME " + cname
+            v4_addrs = v6_addrs = []
         else:
             cache_key = ' '.join(v4_addrs) + ' ' + ' '.join(v6_addrs)
         
