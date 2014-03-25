@@ -316,7 +316,7 @@ class DNSDriver:
             #self.log.debug('Updating server %s: %r', s, serv)
             
             # TODO - use correct domain part!
-            fqdn = serv.get('host') + '.aprs2.net'
+            fqdn = serv.get('host') + '.' + serv.get('domain', '.')
             
             if serv.get('out_of_service') or serv.get('deleted'):
                 names_cnamed[fqdn] = 1
