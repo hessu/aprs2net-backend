@@ -266,6 +266,7 @@ class DNSDriver:
             and status.get(i).get('status') == 'ok' and status.get(i).get('score') != None
             and servers.get(i) and servers.get(i).get('out_of_service') != True
             and servers.get(i).get('deleted') != True]
+            
         members_ok_v4 = [i for i in members_ok if servers.get(i).get('ipv4')]
         members_ok_v6 = [i for i in members_ok if servers.get(i).get('ipv6')]
         
@@ -277,16 +278,31 @@ class DNSDriver:
         scored_order_v4 = sorted(members_ok_v4, key=lambda x:status.get(x).get('score'))
         scored_order_v6 = sorted(members_ok_v6, key=lambda x:status.get(x).get('score'))
         
-        # Limit the sizes of rotates.
+        # Adjust the sizes of rotates: Number of entries * 0.7, so that
+        # load balancing happens even in smaller rotates (the few servers with
+        # the worst score are left out).
+        v4_limit = int(round(len(scored_order_v4) * 0.7))
+        v6_limit = int(round(len(scored_order_v6) * 0.7))
+        
+        # Maximum limit for the sizes of rotates
         # The DNS reply packet needs to be <= 512 bytes, since there are still
         # broken resolvers out there, which don't do EDNS or TCP.
-        scored_order_v4 = scored_order_v4[0:8]
-        scored_order_v6 = scored_order_v6[0:3]
+        v4_limit = min(v4_limit, 8)
+        v6_limit = min(v6_limit, 3)
         
-        self.log.info("Scored order ip4: %r", [(i, '%.1f' % status.get(i).get('score')) for i in scored_order_v4])
-        self.log.info("Scored order ip6: %r", [(i, '%.1f' % status.get(i).get('score')) for i in scored_order_v6])
+        # Have at least 3 addresses in the rotate, anyway.
+        v4_limit = max(v4_limit, 3)
+        v6_limit = max(v6_limit, 3)
         
-        if len(scored_order_v4) < 1:
+        limited_order_v4 = scored_order_v4[0:v4_limit]
+        limited_order_v6 = scored_order_v6[0:v6_limit]
+        
+        self.log.info("Scored order ip4: %r", [(i, '%.1f' % status.get(i).get('score')) for i in limited_order_v4])
+        self.log.info("Left out     ip4: %r", [(i, '%.1f' % status.get(i).get('score')) for i in scored_order_v4[v4_limit:]])
+        self.log.info("Scored order ip6: %r", [(i, '%.1f' % status.get(i).get('score')) for i in limited_order_v6])
+        self.log.info("Left out     ip6: %r", [(i, '%.1f' % status.get(i).get('score')) for i in scored_order_v6[v6_limit:]])
+        
+        if len(limited_order_v4) < 1:
             if domain == self.master_rotate:
                 self.log.error("Ouch! Master rotate %s has no working servers - not doing anything!", self.master_rotate)
                 return
@@ -295,9 +311,9 @@ class DNSDriver:
             self.dns_push(domain, domain, cname=self.master_rotate)
             return
         
-        # Addresses to use
-        v4_addrs = [servers.get(i).get('ipv4') for i in scored_order_v4]
-        v6_addrs = [servers.get(i).get('ipv6') for i in scored_order_v6]
+        # Addresses to use, ordered by score
+        v4_addrs = [servers.get(i).get('ipv4') for i in limited_order_v4]
+        v6_addrs = [servers.get(i).get('ipv6') for i in limited_order_v6]
         
         self.dns_push(domain, domain, v4_addrs=v4_addrs, v6_addrs=v6_addrs)
     
