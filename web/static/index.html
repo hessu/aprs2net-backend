@@ -62,7 +62,7 @@
 	</tr>
 
 <tr ng-repeat="s in group | orderBy : sort.column : sort.descending" ng-click="rowClick(s);"
-	ng-class="{success: s.status.status=='ok', danger: s.status.status=='fail', keydown: s.duration==-1}">
+	ng-class="{success: s.status.status=='ok', danger: s.status.status=='fail', warning: s.config.out_of_service, keydown: s.duration==-1}">
 	<td><a target="_blank" rel="nofollow" href="http://{{ s.config.ipv4 }}:14501/">{{ s.config.id }}</a></td>
 	<td>{{ s.status.props.soft }} {{ s.status.props.vers }}</td>
 	<td>{{ s.status.props.os }}</td>

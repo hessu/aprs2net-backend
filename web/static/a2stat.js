@@ -339,7 +339,7 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 				servermap[id] = i;
 				groupidmap[id] = groups[groupmap[id]].length
 				groups[groupmap[id]].push(servers[i]);
-				//console.log("   " + id + " pushed to " + groupmap[id] + " at position " + groupidmap[id]);
+				//console.log("   " + id + " pushed to " + groupmap[id] + " at position " + groupidmap[id] + " " + JSON.stringify(servers[i]));
 			}
 			
 			$scope.groups = groups;
