@@ -7,6 +7,9 @@ var http = require('http'),
                 
 util.log("startup");
 
+var listen_addr = 'localhost';
+parse_cmdline();
+
 /* Redis keys used */
 kServer = 'aprs2.server';
 kServerStatus = 'aprs2.serverstat';
@@ -49,6 +52,13 @@ app.configure(function() {
 });
 
 var emitter = new events.EventEmitter;
+
+function parse_cmdline() {
+	process.argv.forEach(function (val, index, array) {
+		if (val == '--listen_any')
+			listen_addr = '0.0.0.0';
+	});
+}
 
 function append_event(j) {
 	var m = JSON.parse(j);
@@ -120,9 +130,21 @@ function handle_full_status(req, res)
 				var a = [];
 				
 				for (i in confs) {
+				        var conf = JSON.parse(confs[i]);
+				        // do not display servers marked as deleted
+				        if (conf['deleted'])
+				        	continue;
+				        
+				        // trim unnecessary elements from JSON
+				        delete conf['deleted'];
+				        delete conf['host'];
+				        delete conf['domain'];
+				        if (!conf['out_of_service'])
+				        	delete conf['out_of_service'];
+				        
 					if (stats[i]) {
 						a.push({
-							'config': JSON.parse(confs[i]),
+							'config': conf,
 							'status': stats[i]
 						});
 					}
@@ -232,7 +254,6 @@ app.get('/api/slog', handle_slog); /* fetch a poll log of a server */
 
 util.log("aprs2-status web service set up, starting listener");
 
-//app.listen(8036);
-app.listen(8036, 'localhost');
+app.listen(8036, listen_addr);
 
 
