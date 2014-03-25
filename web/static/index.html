@@ -33,8 +33,9 @@
 <ul class="list-group">
 <li class="list-group-item" ng:class="shownServer.status.status == 'ok' ? 'list-group-item-success' : 'list-group-item-danger'"><b>{{ shownServer.config.id }}</b>
 	<span ng:class="shownServer.status.status == 'ok' ? 'glyphicon glyphicon-ok' : 'glyphicon glyphicon-fire'"></span>
-	<span>  </span>
+	<span>  {{ shownServer.config.fqdn }}  </span>
 	<span ng-show="shownServer.status.props.score"> <span><span class='glyphicon glyphicon-stats'></span> {{ shownServer.status.props.score | number : 1 }}</span></span>
+	<span ng-show="shownServer.config.out_of_service">  <button class='btn btn-xs btn-warning'>Out of service</button></span>
 	<span class='pull-right'>
 		<span class='glyphicon glyphicon-list' ng:click="showLog = !showLog"></span><span class='pull-right glyphicon glyphicon-remove' ng:click="shownServer = 0"></span>
 	</span>
@@ -62,7 +63,7 @@
 	</tr>
 
 <tr ng-repeat="s in group | orderBy : sort.column : sort.descending" ng-click="rowClick(s);"
-	ng-class="{success: s.status.status=='ok', danger: s.status.status=='fail', warning: s.config.out_of_service, keydown: s.duration==-1}">
+	ng-class="{success: s.status.status=='ok', danger: s.status.status=='fail' && !s.config.out_of_service, warning: s.config.out_of_service, keydown: s.duration==-1}">
 	<td><a target="_blank" rel="nofollow" href="http://{{ s.config.ipv4 }}:14501/">{{ s.config.id }}</a></td>
 	<td>{{ s.status.props.soft }} {{ s.status.props.vers }}</td>
 	<td>{{ s.status.props.os }}</td>
@@ -72,7 +73,7 @@
 	<td class="text-right">{{ s.status.props.worst_load | number : 1 }}</td>
 	<td class="text-right">{{ s.status.props.rate_bytes_out | number : 0 }}</td>
 	<td class="text-right">{{ s.status.props.score | number : 0 }}</td>
-	<td><span ng-repeat="e in s.status.errors">{{ e[0] }} </span></td>
+	<td><span ng-show="s.config.out_of_service">serviced </span><span ng-repeat="e in s.status.errors">{{ e[0] }} </span></td>
 	</tr>
 </table>
 </div>
