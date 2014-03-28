@@ -34,6 +34,9 @@ DEFAULT_CONF = {
     # Portal URL for downloading configs
     'portal_base_url': 'https://home.tomh.us:8001',
     
+    # rotates which are not managed
+    'unmanaged_rotates': 'hubs.aprs2.net hub-rotate.aprs2.net',
+    
     # DNS TTL
     'dns_ttl': '600',
 }
@@ -64,6 +67,7 @@ class DNSDriver:
         self.poll_interval = self.config.getint(CONFIG_SECTION, 'poll_interval')
         self.dns_zones = self.config.get(CONFIG_SECTION, 'dns_zones').split(' ')
         self.master_rotate = self.config.get(CONFIG_SECTION, 'master_rotate')
+        self.unmanaged_rotates = self.config.get(CONFIG_SECTION, 'unmanaged_rotates').split(' ')
         self.pollers = self.config.get(CONFIG_SECTION, 'pollers').split(' ')
         self.max_test_result_age = self.config.getint(CONFIG_SECTION, 'max_test_result_age')
         self.min_polled_servers = self.config.getint(CONFIG_SECTION, 'min_polled_servers')
@@ -248,6 +252,8 @@ class DNSDriver:
         servers = self.red.getServers()
         
         for d in rotates:
+            if d in self.unmanaged_rotates:
+                continue
             self.update_dns_rotate(d, rotates[d], merged_status, servers)
         
         # Push the addresses of individual servers
