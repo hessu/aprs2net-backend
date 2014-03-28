@@ -35,7 +35,7 @@
 	<span ng:class="shownServer.status.status == 'ok' ? 'glyphicon glyphicon-ok' : 'glyphicon glyphicon-fire'"></span>
 	<span>  {{ shownServer.config.fqdn }}  </span>
 	<span ng-show="shownServer.status.props.score"> <span><span class='glyphicon glyphicon-stats'></span> {{ shownServer.status.props.score | number : 1 }}</span></span>
-	<span ng-show="shownServer.config.out_of_service">  <button class='btn btn-xs btn-warning'>Out of service</button></span>
+	<span ng-show="shownServer.config.out_of_service">  <a href="#" class="btn btn-warning btn-xs active warning" role="button" style="cursor: default;">Out of service</a></span>
 	<span class='pull-right'>
 		<span class='glyphicon glyphicon-list' ng:click="showLog = !showLog"></span><span class='pull-right glyphicon glyphicon-remove' ng:click="shownServer = 0"></span>
 	</span>
