@@ -204,17 +204,23 @@ class DNSDriver:
             ok_count = 0
             scores = []
             score_sum = 0.0
+            latest_ok = None
+            latest_fail = None
             
             for site in status_set[id]:
                 stat = status_set[id][site]
                 
-                #self.log.debug("status for %s at %s: %r", id, site, stat)
+                self.log.debug("status for %s at %s: %r", id, site, stat)
                 
                 status = stat.get('status', 'Unknown')
                 if status == 'ok':
                     ok_count += 1
+                    if latest_ok == None or latest_ok.get('last_test', 0) < stat.get('last_test', 0):
+                        latest_ok = stat
                 else:
                     score_sum += 1000.0
+                    if latest_fail == None or latest_fail.get('last_test', 0) < stat.get('last_test', 0):
+                        latest_fail = stat
                 
                 props = stat.get('props', {})
                 
@@ -230,8 +236,14 @@ class DNSDriver:
             merged[id] = m = {
                 'status': status,
                 'c_ok': ok_count,
-                'c_res': len(status_set[id])
+                'c_res': len(status_set[id]),
             }
+            
+            if latest_ok:
+                m['s_ok'] = latest_ok
+            
+            if latest_fail:
+                m['s_fail'] = latest_fail
             
             # start off with arithmetic mean of scores... later, figure out
             # something more sensible
@@ -239,6 +251,7 @@ class DNSDriver:
                m['score'] = score_sum / len(scores)
             
             self.log.debug("merged status for %s: %r", id, merged[id])
+            self.red.setServerStatus(id, m)
         
         return merged
     
