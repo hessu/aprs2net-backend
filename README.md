@@ -17,7 +17,8 @@ Installation
 
 Install dependencies:
 
-   apt-get install git redis-server python python-redis nodejs nginx python-lxml
+   apt-get install git redis-server python python-redis python-lxml
+   apt-get install supervisor nodejs nginx
 
 Download:
 
