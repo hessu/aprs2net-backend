@@ -372,7 +372,8 @@ class DNSDriver:
     
     def dns_push(self, logid, fqdn, v4_addrs = [], v6_addrs = [], cname = None):
         """
-        Push a set of A and AAAA records to the DNS
+        Push a set of A and AAAA records to the DNS, but only if they've
+        changed.
         """
         # check if there are any changes, sort the addresses first so that
         # scoring order changes do not cause cache misses
