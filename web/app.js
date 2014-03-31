@@ -8,6 +8,9 @@ var http = require('http'),
 util.log("startup");
 
 var listen_addr = 'localhost';
+var dns_driver = 0;
+var redis_dbid = 0;
+
 parse_cmdline();
 
 /* Redis keys used */
@@ -17,8 +20,16 @@ kServerLog = 'aprs2.serverlog';
 kPollQueue = 'aprs2.pollq';
 kScore = 'aprs2.score';
 kChannelStatus = 'aprs2.chStatus';
+kChannelStatusDns = 'aprs2.chStatusDns';
 kWebConfig = 'aprs2.webconfig';
 kRotate = 'aprs2.rotate';
+
+if (dns_driver) {
+	redis_dbid = 1;
+	redis_channel = kChannelStatusDns;
+} else {
+	redis_channel = kChannelStatus;
+}
 
 var evq_keep_events = 30;
 
@@ -27,36 +38,14 @@ var evq_len = 0;
 
 var evq = [];
 
-/* Set up the redis client */
-red = redis.createClient();
-red.on("error", function (err) {
-	util.log("Redis client error: " + err);
-});
-
-/* Subscribe to updates */
-red_sub = redis.createClient();
-red_sub.on("message", function(channel, message) {
-	util.log("channel " + channel + ": " + message);
-	append_event(message);
-});
-red_sub.subscribe(kChannelStatus);
-
-/* Set up the express app */
-var app = express();
-app.configure(function() {
-	app.use(express.bodyParser());
-	app.use(express.methodOverride());
-	app.use(app.router);
-	app.use(express.static("static"));
-	app.use(express.errorHandler({ dumpExceptions: true, showStack: true }));
-});
-
 var emitter = new events.EventEmitter;
 
 function parse_cmdline() {
 	process.argv.forEach(function (val, index, array) {
 		if (val == '--listen_any')
 			listen_addr = '0.0.0.0';
+		if (val == '--dns_driver')
+			dns_driver = 1;
 	});
 }
 
@@ -248,12 +237,44 @@ var handle_slog = function(req, res) {
 	});
 };
 
-app.get('/api/full', handle_full_status); /* fetch full server list */
-app.get('/api/upd', handle_upd); /* fetch updates to servers */
-app.get('/api/slog', handle_slog); /* fetch a poll log of a server */
+/* Set up the redis client */
+red = redis.createClient();
+red.on("error", function (err) {
+	util.log("Redis client error: " + err);
+});
 
-util.log("aprs2-status web service set up, starting listener");
+red.select(redis_dbid, function() {
+	util.log("Selected database " + redis_dbid);
+	init();
+});
 
-app.listen(8036, listen_addr);
 
+function init() {
+	/* Subscribe to updates */
+	red_sub = redis.createClient();
+	red_sub.on("message", function(channel, message) {
+		util.log("channel " + channel + ": " + message);
+		append_event(message);
+	});
+	util.log("Listening for updates on " + redis_channel);
+	red_sub.subscribe(redis_channel);
+
+	/* Set up the express app */
+	var app = express();
+	app.configure(function() {
+		app.use(express.bodyParser());
+		app.use(express.methodOverride());
+		app.use(app.router);
+		app.use(express.static("static"));
+		app.use(express.errorHandler({ dumpExceptions: true, showStack: true }));
+	});
+
+	app.get('/api/full', handle_full_status); /* fetch full server list */
+	app.get('/api/upd', handle_upd); /* fetch updates to servers */
+	app.get('/api/slog', handle_slog); /* fetch a poll log of a server */
+
+	util.log("aprs2-status web service set up, starting listener");
+
+	app.listen(8036, listen_addr);
+}
 
