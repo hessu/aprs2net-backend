@@ -72,6 +72,7 @@
 	<td class="text-right">{{ s.status.props.clients | number : 0 }}</td>
 	<td class="text-right">{{ s.status.props.worst_load | number : 1 }}</td>
 	<td class="text-right">{{ s.status.props.rate_bytes_out | number : 0 }}</td>
+	<td ng-show="cfg.master" class="text-right">{{ s.status.c }}</td>
 	<td class="text-right">{{ s.status.props.score | number : 0 }}</td>
 	<td><span ng-show="s.config.out_of_service">serviced </span><span ng-repeat="e in s.status.errors">{{ e[0] }} </span></td>
 	</tr>

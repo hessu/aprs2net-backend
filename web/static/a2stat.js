@@ -218,23 +218,33 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 		fetchLog(s.config.id);
 	}
 	
-	$scope.columns = [
-		[ 'config.id', 'Server ID' ],
-		[ 'status.props.vers', 'Version' ],
-		[ 'status.props.os', 'OS' ],
-		[ 'status.last_test', 'Tested' ],
-		[ 'status.last_ok', 'Last OK' ],
-		[ 'status.props.clients', 'Clients' ],
-		[ 'status.props.worst_load', 'C load' ],
-		[ 'status.props.rate_bytes_out', 'B out/s' ],
-		[ 'status.props.score', 'Score' ],
-		[ 'status.props.info', 'Info' ]
-	];
-	
-	$scope.sort = {
-		column: 'config.id',
-		descending: false
-	};
+	var initial_load = 1;
+	var setup_columns = function(cfg) {
+		var cols = [
+			[ 'config.id', 'Server ID' ],
+			[ 'status.props.vers', 'Version' ],
+			[ 'status.props.os', 'OS' ],
+			[ 'status.last_test', 'Tested' ],
+			[ 'status.last_ok', 'Last OK' ],
+			[ 'status.props.clients', 'Clients' ],
+			[ 'status.props.worst_load', 'C load' ],
+			[ 'status.props.rate_bytes_out', 'B out/s' ]
+		];
+		
+		if (cfg['master']) {
+			cols.push([ 'status.c', 'OK' ]);
+		}
+			
+		cols.push([ 'status.props.score', 'Score' ],
+			[ 'status.props.info', 'Info' ]
+		);
+		$scope.columns = cols;
+		
+		$scope.sort = {
+			column: 'config.id',
+			descending: false
+		};
+	}
 	
 	$scope.sortIndicator = function(column) {
 		if (column == $scope.sort.column) {
@@ -312,6 +322,11 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 		var config = { 'params': { } };
 		$http.get('/api/full', config).success(function(d) {
 			console.log('HTTP full download received, status: ' + d['result']);
+			
+			if (initial_load) {
+				initial_load = 0;
+				setup_columns(d['cfg']);
+			}
 			
 			$scope.evq = evq = d['evq'];
 			$scope.cfg = d['cfg'];

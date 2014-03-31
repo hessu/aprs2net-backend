@@ -82,8 +82,15 @@ class DNSDriver:
         # cache DNS state for each name, to prevent updates which do not change anything
         self.dns_update_cache = {}
         
+        # config object for the web UI
+        self.web_config = {
+            'site_descr': self.config.get(CONFIG_SECTION, 'site_descr'),
+            'master': 1
+        }
+        
         # redis client
         self.red = aprs2_redis.APRS2Redis(db=1)
+        self.red.setWebConfig(self.web_config)
         self.config_manager = aprs2_config.ConfigManager(logging.getLogger('config'), self.red, self.portal_base_url)
     
     def fetch_full_status(self):
@@ -203,9 +210,11 @@ class DNSDriver:
         for id in status_set:
             ok_count = 0
             scores = []
+            errors = {}
             score_sum = 0.0
             latest_ok = None
             latest_fail = None
+            latest = None
             
             for site in status_set[id]:
                 stat = status_set[id][site]
@@ -213,6 +222,9 @@ class DNSDriver:
                 self.log.debug("status for %s at %s: %r", id, site, stat)
                 
                 status = stat.get('status', 'Unknown')
+                if latest == None or latest.get('last_test', 0) < stat.get('last_test', 0):
+                    latest = stat
+                    
                 if status == 'ok':
                     ok_count += 1
                     if latest_ok == None or latest_ok.get('last_test', 0) < stat.get('last_test', 0):
@@ -224,9 +236,13 @@ class DNSDriver:
                 
                 props = stat.get('props', {})
                 
-                if 'score' in props:
+                if props != None and 'score' in props:
                     scores.append(props['score'])
                     score_sum += props['score']
+                
+                e = stat.get('errors', [])
+                for k, v in e:
+                    errors[k] = v
             
             if ok_count >= 1 and float(ok_count) / len(status_set[id]) > 0.48:
                 status = 'ok'
@@ -235,15 +251,23 @@ class DNSDriver:
             
             merged[id] = m = {
                 'status': status,
+                'c': '%d/%d' % (ok_count, len(status_set[id])),
                 'c_ok': ok_count,
                 'c_res': len(status_set[id]),
             }
             
-            if latest_ok:
-                m['s_ok'] = latest_ok
+            if latest:
+                m['props'] = latest.get('props')
+                m['last_test'] = latest.get('last_test')
             
-            if latest_fail:
-                m['s_fail'] = latest_fail
+            if errors:
+                m['errors'] = [[k, errors[k]] for k in errors]
+            
+            #if latest_ok:
+            #    m['s_ok'] = latest_ok
+            
+            #if latest_fail:
+            #    m['s_fail'] = latest_fail
             
             # start off with arithmetic mean of scores... later, figure out
             # something more sensible
