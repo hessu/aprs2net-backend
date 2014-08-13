@@ -262,6 +262,8 @@ class DNSDriver:
             
             if errors:
                 m['errors'] = [[k, errors[k]] for k in errors]
+            else:
+                m['errors'] = []
             
             #if latest_ok:
             #    m['s_ok'] = latest_ok
