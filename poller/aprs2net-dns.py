@@ -200,7 +200,7 @@ class DNSDriver:
         
         set[siteid] = stat
     
-    def merge_status(self, status_set):
+    def merge_status(self, servers, status_set):
         """
         Merge status sets to produce final score for each server
         """
@@ -274,21 +274,24 @@ class DNSDriver:
             # start off with arithmetic mean of scores... later, figure out
             # something more sensible
             if len(scores) > 0:
-               m['score'] = score_sum / len(scores)
+                m['score'] = score_sum / len(scores)
             
             self.log.debug("merged status for %s: %r", id, merged[id])
             self.red.setServerStatus(id, m)
+            
+            server = servers.get(id)
+            if server:
+                self.red.sendServerStatusMessage({ 'config': server, 'status': m })
         
         return merged
     
-    def update_dns(self, merged_status):
+    def update_dns(self, servers, merged_status):
         """
         Update DNS to match the current merged status
         """
         
         # Fetch setup from database (maintaned by config manager thread)
         rotates = self.red.getRotates()
-        servers = self.red.getServers()
         
         for d in rotates:
             if d in self.unmanaged_rotates:
@@ -479,12 +482,15 @@ class DNSDriver:
         # pollers which appear to be faulty
         status_set = self.fetch_full_status()
         
+        # Fetch setup from database (maintaned by config manager thread)
+        servers = self.red.getServers()
+        
         # Merge status JSONs, ignoring old polling results for individual servers,
         # figure out per-server "final score"
-        merged_status = self.merge_status(status_set)
+        merged_status = self.merge_status(servers, status_set)
         
         # Push current DNS status to the master, if it has changed
-        self.update_dns(merged_status)
+        self.update_dns(servers, merged_status)
     
     def loop(self):
         """
