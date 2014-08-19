@@ -18,6 +18,7 @@ kScore = 'aprs2.score'
 kChannelStatus = 'aprs2.chStatus'
 kWebConfig = 'aprs2.webconfig'
 kRotate = 'aprs2.rotate'
+kRotateStatus = 'aprs2.rotateStatus'
 
 class APRS2Redis:
     def __init__(self, host='localhost', port=6379, db=0):
@@ -184,3 +185,22 @@ class APRS2Redis:
 
     	return o
     
+    def storeRotateStatus(self, id, rot):
+    	"""
+    	Store a single rotate status
+    	"""
+    	return self.red.hset(kRotateStatus, id, json.dumps(rot))
+    
+    def getRotateStatus(self):
+    	"""
+    	Get full rotate status
+    	"""
+    	d = self.red.hgetall(kRotateStatus)
+    	if d == None:
+    		return d
+    	
+    	o = {}
+    	for k in d:
+    	   o[k] = json.loads(d[k])
+
+    	return o

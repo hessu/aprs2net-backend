@@ -356,6 +356,8 @@ class DNSDriver:
             self.dns_push(domain, domain, cname=self.master_rotate)
             return
         
+        self.red.storeRotateStatus(domain, list(set(scored_order_v4) | set(scored_order_v6)))
+        
         # Addresses to use, ordered by score
         v4_addrs = [servers.get(i).get('ipv4') for i in limited_order_v4]
         v6_addrs = [servers.get(i).get('ipv6') for i in limited_order_v6]
