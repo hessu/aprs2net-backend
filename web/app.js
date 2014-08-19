@@ -8,8 +8,10 @@ var http = require('http'),
 util.log("startup");
 
 var listen_addr = 'localhost';
-var dns_driver = 0;
 var redis_dbid = 0;
+
+var ops = {};
+
 
 parse_cmdline();
 
@@ -24,7 +26,7 @@ kChannelStatusDns = 'aprs2.chStatusDns';
 kWebConfig = 'aprs2.webconfig';
 kRotate = 'aprs2.rotate';
 
-if (dns_driver) {
+if (ops['dns_driver']) {
 	redis_dbid = 1;
 	redis_channel = kChannelStatusDns;
 } else {
@@ -41,12 +43,17 @@ var evq = [];
 var emitter = new events.EventEmitter;
 
 function parse_cmdline() {
-	process.argv.forEach(function (val, index, array) {
-		if (val == '--listen_any')
-			listen_addr = '0.0.0.0';
-		if (val == '--dns_driver')
-			dns_driver = 1;
+	var stdio = require('stdio');
+	ops = stdio.getopt({
+		'listen_any': {key: 'a', description: 'Listen on INADDR_ANY instead of loopback'},
+		'port': {key: 'p', args: 1, description: 'Specify TCP port to listen on'},
+		'dns_driver': {key: 'd', description: 'Run in DNS driver mode'}
 	});
+	
+	if (ops['listen_any'])
+		listen_addr = '0.0.0.0';
+	if (!ops['port'])
+		ops['port'] = '8036';
 }
 
 function append_event(j) {
@@ -272,9 +279,11 @@ function init() {
 	app.get('/api/full', handle_full_status); /* fetch full server list */
 	app.get('/api/upd', handle_upd); /* fetch updates to servers */
 	app.get('/api/slog', handle_slog); /* fetch a poll log of a server */
+	
+	var listen_port = parseInt(ops['port']);
 
-	util.log("aprs2-status web service set up, starting listener");
+	util.log("aprs2-status web service set up, starting listener on port " + listen_port);
 
-	app.listen(8036, listen_addr);
+	app.listen(listen_port, listen_addr);
 }
 
