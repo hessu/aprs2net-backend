@@ -277,12 +277,12 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 		$http.get('/api/upd', config).success(function(d) {
 			console.log('HTTP update received, status: ' + d['result']);
 			
-			if (d['result'] == 'reload') {
-				console.log('going for full reload...');
-				full_load($scope, $http);
+			if (d['result'] == 'full') {
+				console.log('got full reload...');
+				process_full_load($scope, $http, d);
 				return;
 			}
-			if (d['result'] != 'ok') {
+			if (d['result'] != 'upd') {
 				console.log('result ' + d['result']);
 				return;
 			}
@@ -318,6 +318,44 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 		});
 	};
 	
+	process_full_load = function($scope, $http, d) {
+		$scope.evq = evq = d['evq'];
+		$scope.cfg = d['cfg'];
+		var a = [];
+		var servers = d['servers'];
+		servermap = {};
+		groupmap = {};
+		
+		groups = [];
+		for (var i in $scope.nets) {
+			var n = $scope.nets[i];
+			console.log("  group " + i + ": " + n.id);
+			var rot = d['rotates'][n.id];
+			
+			for (var id in rot['members']) {
+				groupmap[rot['members'][id]] = groups.length;
+				//console.log("     - " + rot['members'][id]);
+			}
+			groups.push([]);
+		}
+		
+		tables = {};
+		for (var i in servers) {
+			var id = servers[i]['config']['id'];
+			servermap[id] = i;
+			groupidmap[id] = groups[groupmap[id]].length
+			groups[groupmap[id]].push(servers[i]);
+			//console.log("   " + id + " pushed to " + groupmap[id] + " at position " + groupidmap[id] + " " + JSON.stringify(servers[i]));
+		}
+		
+		$scope.groups = groups;
+		$scope.rotates = d['rotates'];
+		
+		summary_update();
+		
+		setTimeout(function() { ajax_update($scope, $http); }, 1200);
+	}
+	
 	full_load = function($scope, $http) {
 		var config = { 'params': { } };
 		$http.get('/api/full', config).success(function(d) {
@@ -328,41 +366,7 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 				setup_columns(d['cfg']);
 			}
 			
-			$scope.evq = evq = d['evq'];
-			$scope.cfg = d['cfg'];
-			var a = [];
-			var servers = d['servers'];
-			servermap = {};
-			groupmap = {};
-			
-			groups = [];
-			for (var i in $scope.nets) {
-				var n = $scope.nets[i];
-				console.log("  group " + i + ": " + n.id);
-				var rot = d['rotates'][n.id];
-				
-				for (var id in rot['members']) {
-					groupmap[rot['members'][id]] = groups.length;
-					//console.log("     - " + rot['members'][id]);
-				}
-				groups.push([]);
-			}
-			
-			tables = {};
-			for (var i in servers) {
-				var id = servers[i]['config']['id'];
-				servermap[id] = i;
-				groupidmap[id] = groups[groupmap[id]].length
-				groups[groupmap[id]].push(servers[i]);
-				//console.log("   " + id + " pushed to " + groupmap[id] + " at position " + groupidmap[id] + " " + JSON.stringify(servers[i]));
-			}
-			
-			$scope.groups = groups;
-			$scope.rotates = d['rotates'];
-			
-			summary_update();
-			
-			setTimeout(function() { ajax_update($scope, $http); }, 1200);
+			process_full_load($scope, $http, d);
 		}).error(function(data, status, headers, config) {
 			console.log('HTTP full download failed, status: ' + status);
 			setTimeout(function() { full_load($scope, $http); }, 10000);

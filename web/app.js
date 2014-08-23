@@ -35,7 +35,7 @@ if (ops['dns_driver']) {
 
 var evq_keep_events = 30;
 
-var evq_seq = -1;
+var evq_seq = 10;
 var evq_len = 0;
 
 var evq = [];
@@ -58,10 +58,17 @@ function parse_cmdline() {
 
 function append_event(j) {
 	var m = JSON.parse(j);
+	
+	if (m['reload']) {
+		util.log("got new event for full reload");
+		emitter.emit("event:notify", 0);
+		return;
+	}
+	
 	evq.push(m);
 	evq_len++;
 	evq_seq++;
-	//util.log("got new event " + evq_seq + " evq len " + evq_len);
+	util.log("got new event " + evq_seq + " evq len " + evq_len);
 	
 	while (evq_len > evq_keep_events) {
 		evq.shift();
@@ -92,7 +99,6 @@ function upd_response(seq, res)
 		seq_dif = evq.length;
 	util.log("client is " + seq_dif + " events late");
 	
-	
 	var ev;
 	if (seq_dif > 0)
 		ev = last_events(seq_dif);
@@ -101,7 +107,7 @@ function upd_response(seq, res)
 	
 	res.setHeader('Cache-Control', 'no-cache');
 	res.json({
-		'result': 'ok',
+		'result': 'upd',
 		'evq': {
 			'seq': evq_seq,
 			'len': evq_len
@@ -114,6 +120,11 @@ function handle_full_status(req, res)
 {
 	util.log("full req: " + JSON.stringify(req.query));
 	
+	generate_full_status(req, res);
+}
+
+function generate_full_status(req, res)
+{
 	red.hgetall(kServerStatus, function (err, stats) {
 		for (i in stats)
 			stats[i] = JSON.parse(stats[i]);
@@ -151,7 +162,7 @@ function handle_full_status(req, res)
 					
 					res.setHeader('Cache-Control', 'no-cache');
 					res.json({
-						'result': 'ok',
+						'result': 'full',
 						'cfg': cfg,
 						'evq': {
 							'seq': evq_seq,
@@ -181,9 +192,8 @@ var handle_upd = function(req, res) {
 		//console.log("client seq " + seq + " > my seq " + evq_seq + " - starting from -1");
 		seq = -1;
 	} else if (evq_seq - seq > evq_len) {
-		//console.log("client is too late, doing full reload");
-		res.setHeader('Cache-Control', 'no-cache');
-		res.json({ 'result': 'reload' });
+		//console.log("client is too late, returning full reload");
+		generate_full_status(req, res);
 		return;
 	}
 	
@@ -208,7 +218,13 @@ var handle_upd = function(req, res) {
 		var notify = function(id) {
 			clearTimeout(tout);
 			util.log("sending longpoll response, seq now " + id);
-			upd_response(seq, res);
+			if (id == 0) {
+				util.log("  ... full response");
+				generate_full_status(req, res);
+			} else {
+				util.log("  ... upd response");
+				upd_response(seq, res);
+			}
 		};
 		
 		// when we have an event, return response

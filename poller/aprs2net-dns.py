@@ -137,8 +137,8 @@ class DNSDriver:
         Check if the returned full status set is any good
         """
         
-        if j.get('result') != 'ok':
-            self.log.error("%s: Full status JSON does not have result: ok", siteid)
+        if j.get('result') != 'full' and j.get('result') != 'ok':
+            self.log.error("%s: Full status JSON does not have result: ok/full", siteid)
             return
         
         servers = j.get('servers')
@@ -278,10 +278,6 @@ class DNSDriver:
             
             self.log.debug("merged status for %s: %r", id, merged[id])
             self.red.setServerStatus(id, m)
-            
-            server = servers.get(id)
-            if server:
-                self.red.sendDnsStatusMessage({ 'config': server, 'status': m })
         
         return merged
     
@@ -491,6 +487,8 @@ class DNSDriver:
         
         # Push current DNS status to the master, if it has changed
         self.update_dns(servers, merged_status)
+        
+        self.red.sendDnsStatusMessage({ 'reload': 'full' })
     
     def loop(self):
         """
