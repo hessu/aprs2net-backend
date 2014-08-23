@@ -281,7 +281,7 @@ class DNSDriver:
             
             server = servers.get(id)
             if server:
-                self.red.sendServerStatusMessage({ 'config': server, 'status': m })
+                self.red.sendDnsStatusMessage({ 'config': server, 'status': m })
         
         return merged
     

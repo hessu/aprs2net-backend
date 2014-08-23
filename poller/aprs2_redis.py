@@ -16,6 +16,7 @@ kServerLog = 'aprs2.serverlog'
 kPollQueue = 'aprs2.pollq'
 kScore = 'aprs2.score'
 kChannelStatus = 'aprs2.chStatus'
+kChannelStatusDns = 'aprs2.chStatusDns'
 kWebConfig = 'aprs2.webconfig'
 kRotate = 'aprs2.rotate'
 kRotateStatus = 'aprs2.rotateStatus'
@@ -51,6 +52,9 @@ class APRS2Redis:
     
     def sendServerStatusMessage(self, msg):
         self.red.publish(kChannelStatus, json.dumps(msg))
+    
+    def sendDnsStatusMessage(self, msg):
+        self.red.publish(kChannelStatusDns, json.dumps(msg))
     
     def setServerStatus(self, id, status):
         """
