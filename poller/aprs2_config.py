@@ -203,7 +203,7 @@ class ConfigManager:
             	addr_map[ip6] = id
             
             if c.get('deleted'):
-                self.log.info("Server is marked as deleted, removing from poll queue: %s", id)
+                #self.log.info("Server is marked as deleted, removing from poll queue: %s", id)
                 self.red.delPollQ(id)
             else:
                 if self.red.getPollQ(id) == None:
