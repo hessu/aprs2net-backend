@@ -23,7 +23,7 @@ DEFAULT_CONF = {
     'poll_interval': '300',
     
     # Portal URL for downloading configs
-    'portal_base_url': 'https://home.tomh.us:8001'
+    'portal_base_url': 'https://t2dev.aprs2.net'
 }
 
 class Poller:

@@ -32,7 +32,7 @@ DEFAULT_CONF = {
     'min_polled_ok_pct': '55',
     
     # Portal URL for downloading configs
-    'portal_base_url': 'https://home.tomh.us:8001',
+    'portal_base_url': 'https://t2dev.aprs2.net',
     
     # rotates which are not managed
     'unmanaged_rotates': 'hubs.aprs2.net hub-rotate.aprs2.net',
