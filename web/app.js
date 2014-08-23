@@ -25,6 +25,7 @@ kChannelStatus = 'aprs2.chStatus';
 kChannelStatusDns = 'aprs2.chStatusDns';
 kWebConfig = 'aprs2.webconfig';
 kRotate = 'aprs2.rotate';
+kRotateStatus = 'aprs2.rotateStatus'
 
 if (ops['dns_driver']) {
 	redis_dbid = 1;
@@ -134,48 +135,52 @@ function generate_full_status(req, res)
 				rots[i] = JSON.parse(rots[i]);
 			
 			red.hgetall(kServer, function (err, confs) {
-				var a = [];
-				
-				for (i in confs) {
-				        var conf = JSON.parse(confs[i]);
-				        // do not display servers marked as deleted
-				        if (conf['deleted'])
-				        	continue;
-				        
-				        // trim unnecessary elements from JSON
-				        delete conf['deleted'];
-				        delete conf['host'];
-				        delete conf['domain'];
-				        if (!conf['out_of_service'])
-				        	delete conf['out_of_service'];
-				        
-					if (stats[i]) {
-						a.push({
-							'config': conf,
-							'status': stats[i]
-						});
-					}
-				}
-				
-				red.get(kWebConfig, function(err, cfg) {
-					cfg = JSON.parse(cfg);
-					
-					res.setHeader('Cache-Control', 'no-cache');
-					res.json({
-						'result': 'full',
-						'cfg': cfg,
-						'evq': {
-							'seq': evq_seq,
-							'len': evq_len
-						},
-						'rotates': rots,
-						'servers': a
-					});
-				});
+				send_full_status(req, res, stats, rots, confs);
 			});
 		});
 	});
-	
+}
+
+function send_full_status(req, res, stats, rots, confs)
+{
+	var a = [];
+
+	for (i in confs) {
+		var conf = JSON.parse(confs[i]);
+		// do not display servers marked as deleted
+		if (conf['deleted'])
+			continue;
+		
+		// trim unnecessary elements from JSON
+		delete conf['deleted'];
+		delete conf['host'];
+		delete conf['domain'];
+		if (!conf['out_of_service'])
+			delete conf['out_of_service'];
+		
+		if (stats[i]) {
+			a.push({
+				'config': conf,
+				'status': stats[i]
+			});
+		}
+	}
+
+	red.get(kWebConfig, function(err, cfg) {
+		cfg = JSON.parse(cfg);
+		
+		res.setHeader('Cache-Control', 'no-cache');
+		res.json({
+			'result': 'full',
+			'cfg': cfg,
+			'evq': {
+				'seq': evq_seq,
+				'len': evq_len
+			},
+			'rotates': rots,
+			'servers': a
+		});
+	});
 }
 
 var handle_upd = function(req, res) {
