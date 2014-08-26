@@ -189,22 +189,9 @@ class APRS2Redis:
 
     	return o
     
-    def storeRotateStatus(self, id, rot):
+    def storeRotateStatus(self, rot):
     	"""
     	Store a single rotate status
     	"""
-    	return self.red.hset(kRotateStatus, id, json.dumps(rot))
+    	return self.red.set(kRotateStatus, json.dumps(rot))
     
-    def getRotateStatus(self):
-    	"""
-    	Get full rotate status
-    	"""
-    	d = self.red.hgetall(kRotateStatus)
-    	if d == None:
-    		return d
-    	
-    	o = {}
-    	for k in d:
-    	   o[k] = json.loads(d[k])
-
-    	return o

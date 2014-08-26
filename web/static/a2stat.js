@@ -293,14 +293,14 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 				for (var i in d['ev']) {
 					var srvr = d['ev'][i];
 					var id = srvr['config']['id'];
-					console.log("  server " + id);
+					//console.log("  server " + id);
 					var idx = servermap[id];
 					if (idx) {
 						groups[groupmap[id]][groupidmap[id]] = srvr;
-						console.log("   added: " + JSON.stringify(srvr));
+						//console.log("   added: " + JSON.stringify(srvr));
 						if ($scope.shownServer && id == $scope.shownServer.config.id) {
 							$scope.shownServer = srvr;
-							console.log("  shown server, fetching log");
+							//console.log("  shown server, fetching log");
 							fetchLog(id);
 						}
 					} else {
@@ -323,13 +323,14 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 		$scope.cfg = d['cfg'];
 		var a = [];
 		var servers = d['servers'];
+		var rotatestat = d['rotatestat'];
 		servermap = {};
 		groupmap = {};
 		
 		groups = [];
 		for (var i in $scope.nets) {
 			var n = $scope.nets[i];
-			console.log("  group " + i + ": " + n.id);
+			//console.log("  group " + i + ": " + n.id);
 			var rot = d['rotates'][n.id];
 			
 			for (var id in rot['members']) {
@@ -342,6 +343,11 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 		tables = {};
 		for (var i in servers) {
 			var id = servers[i]['config']['id'];
+			//console.log('id ' + id + ' i ' + i);
+			if (rotatestat && rotatestat[id] && rotatestat[id]['rotate.aprs2.net']) {
+				servers[i]['rotate'] = 1;
+				//console.log(' --- is in rotate');
+			}
 			servermap[id] = i;
 			groupidmap[id] = groups[groupmap[id]].length
 			groups[groupmap[id]].push(servers[i]);

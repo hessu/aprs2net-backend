@@ -25,7 +25,7 @@ kChannelStatus = 'aprs2.chStatus';
 kChannelStatusDns = 'aprs2.chStatusDns';
 kWebConfig = 'aprs2.webconfig';
 kRotate = 'aprs2.rotate';
-kRotateStatus = 'aprs2.rotateStatus'
+kRotateStatus = 'aprs2.rotateStatus';
 
 if (ops['dns_driver']) {
 	redis_dbid = 1;
@@ -135,13 +135,20 @@ function generate_full_status(req, res)
 				rots[i] = JSON.parse(rots[i]);
 			
 			red.hgetall(kServer, function (err, confs) {
-				send_full_status(req, res, stats, rots, confs);
+				if (ops['dns_driver']) {
+					red.get(kRotateStatus, function (err, rotstats) {
+						rotstats = JSON.parse(rotstats);
+						send_full_status(req, res, stats, rots, rotstats, confs);
+					});
+				} else {
+					send_full_status(req, res, stats, rots, null, confs);
+				}
 			});
 		});
 	});
 }
 
-function send_full_status(req, res, stats, rots, confs)
+function send_full_status(req, res, stats, rots, rotstats, confs)
 {
 	var a = [];
 
@@ -178,6 +185,7 @@ function send_full_status(req, res, stats, rots, confs)
 				'len': evq_len
 			},
 			'rotates': rots,
+			'rotatestat': rotstats,
 			'servers': a
 		});
 	});

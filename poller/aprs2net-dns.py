@@ -289,15 +289,21 @@ class DNSDriver:
         # Fetch setup from database (maintaned by config manager thread)
         rotates = self.red.getRotates()
         
+        # Which servers are taking part in one of the rotations
+        participating_servers = {}
+        
         for d in rotates:
             if d in self.unmanaged_rotates:
                 continue
-            self.update_dns_rotate(d, rotates[d], merged_status, servers)
+            self.update_dns_rotate(d, rotates[d], merged_status, servers, participating_servers)
         
         # Push the addresses of individual servers
         self.update_dns_hosts(servers, merged_status)
+        
+        self.log.info("participating servers: %r", participating_servers)
+        self.red.storeRotateStatus(participating_servers)
     
-    def update_dns_rotate(self, domain, domain_conf, status, servers):
+    def update_dns_rotate(self, domain, domain_conf, status, servers, participating_servers):
         """
         Update a single DNS rotate
         """
@@ -355,7 +361,12 @@ class DNSDriver:
             self.dns_push(domain, domain, cname=self.master_rotate)
             return
         
-        self.red.storeRotateStatus(domain, list(set(scored_order_v4) | set(scored_order_v6)))
+        for i in list(set(limited_order_v4) | set(limited_order_v6)):
+            h = participating_servers.get(i)
+            if h:
+            	h[domain] = 1
+            else:
+            	participating_servers[i] = { domain: 1 }
         
         # Addresses to use, ordered by score
         v4_addrs = [servers.get(i).get('ipv4') for i in limited_order_v4]
