@@ -275,6 +275,8 @@ class DNSDriver:
             # something more sensible
             if len(scores) > 0:
                 m['score'] = score_sum / len(scores)
+                if m['props']:
+                    m['props']['score'] = m['score']
             
             self.log.debug("merged status for %s: %r", id, merged[id])
             self.red.setServerStatus(id, m)
