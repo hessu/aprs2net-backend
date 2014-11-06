@@ -289,6 +289,13 @@ class DNSDriver:
                 if m['props']:
                     m['props']['score'] = m['score']
             
+            # retain some properties
+            prev_state = self.red.getServerStatus(id)
+            if status != prev_state.get('status') or not prev_state.get('last_change'):
+                m['last_change'] = m.get('last_test')
+            else:
+                m['last_change'] = prev_state.get('last_change')
+                
             self.log.debug("merged status for %s: %r", id, m)
             self.red.setServerStatus(id, m)
         

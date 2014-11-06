@@ -225,7 +225,7 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 			[ 'status.props.vers', 'Version' ],
 			[ 'status.props.os', 'OS' ],
 			[ 'status.last_test', 'Tested' ],
-			[ 'status.last_ok', 'Last OK' ],
+			[ 'status.last_change', 'Changed' ],
 			[ 'status.props.clients', 'Clients' ],
 			[ 'status.props.worst_load', 'C load' ],
 			[ 'status.props.rate_bytes_out', 'B out/s' ]

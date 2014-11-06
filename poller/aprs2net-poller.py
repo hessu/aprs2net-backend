@@ -100,9 +100,10 @@ class Poller:
         if state == None:
             state = {}
         
+        prev_status = state.get('status')
+        
         if success == True:
             state['status'] = 'ok'
-            state['last_ok'] = now
             state['props'] = props
         else:
             state['status'] = 'fail'
@@ -115,6 +116,9 @@ class Poller:
                     for i in ('type', 'soft', 'vers', 'os', 'id'):
                         keep_props[i] = old_props.get(i)
                     state['props'] = keep_props
+        
+        if state['status'] != prev_status or 'last_change' not in state:
+            state['last_change'] = now
         
         state['errors'] = p.errors
         state['last_test'] = now
