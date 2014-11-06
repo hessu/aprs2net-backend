@@ -216,6 +216,9 @@ class DNSDriver:
             latest_fail = None
             latest = None
             
+            merged_scorebase = {}
+            avg_scorebase = {}
+            
             for site in status_set[id]:
                 stat = status_set[id][site]
                 
@@ -239,6 +242,11 @@ class DNSDriver:
                 if props != None and 'score' in props:
                     scores.append(props['score'])
                     score_sum += props['score']
+                    if 'scorebase' in props:
+                    	sb = props['scorebase']
+                    	for k in sb:
+                    	    avg_scorebase[k] = avg_scorebase[k] + sb[k] if (k in avg_scorebase) else sb[k]
+                        merged_scorebase[site] = props['scorebase']
                 
                 e = stat.get('errors', [])
                 for k, v in e:
@@ -253,8 +261,11 @@ class DNSDriver:
                 'status': status,
                 'c': '%d/%d' % (ok_count, len(status_set[id])),
                 'c_ok': ok_count,
-                'c_res': len(status_set[id]),
+                'c_res': len(status_set[id])
             }
+            
+            if merged_scorebase:
+            	m['merged_scorebase'] = merged_scorebase
             
             if latest:
                 m['props'] = latest.get('props')
@@ -278,7 +289,7 @@ class DNSDriver:
                 if m['props']:
                     m['props']['score'] = m['score']
             
-            self.log.debug("merged status for %s: %r", id, merged[id])
+            self.log.debug("merged status for %s: %r", id, m)
             self.red.setServerStatus(id, m)
         
         return merged
