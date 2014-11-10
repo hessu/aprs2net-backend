@@ -20,11 +20,16 @@ Install dependencies:
    apt-get install git redis-server python python-redis python-lxml
    apt-get install supervisor nodejs nginx
 
+Prepare:
+
+   sudo adduser --system --disabled-login --group t2poll
+   cd /opt
+   sudo mkdir aprs2net-backend
+   sudo chown t2poll:t2poll aprs2net-backend
+
 Download:
 
-   cd /opt
-   adduser t2poll, addgroup t2poll (TODO, work out details)
-   git clone -b release https://github.com/hessu/aprs2net-backend.git
+   sudo -u t2poll git clone -b release https://github.com/hessu/aprs2net-backend.git
 
 Adjust nginx config:
 
