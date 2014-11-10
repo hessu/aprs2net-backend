@@ -24,9 +24,6 @@ Prepare:
 
    sudo adduser --system --disabled-login --group t2poll
    cd /opt
-   sudo mkdir aprs2net-backend
-   sudo mkdir aprs2net-backend/logs
-   sudo chown t2poll:t2poll aprs2net-backend/logs
 
 Download:
 
@@ -42,6 +39,9 @@ Adjust nginx config:
 
 Adjust poller config:
 
+  cd /opt/aprs2net-backend
+  sudo mkdir logs
+  sudo chown t2poll:t2poll logs
   cd /opt/aprs2net-backend/poller
   cp poller-example.conf poller.conf
   # edit poller conf
