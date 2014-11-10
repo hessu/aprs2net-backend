@@ -25,14 +25,31 @@ Prepare:
    sudo adduser --system --disabled-login --group t2poll
    cd /opt
    sudo mkdir aprs2net-backend
-   sudo chown t2poll:t2poll aprs2net-backend
+   sudo mkdir aprs2net-backend/logs
+   sudo chown t2poll:t2poll aprs2net-backend/logs
 
 Download:
 
-   sudo -u t2poll git clone -b release https://github.com/hessu/aprs2net-backend.git
-
+   sudo git clone -b release https://github.com/hessu/aprs2net-backend.git
+   
 Adjust nginx config:
 
   rm /etc/nginx/sites-enabled/default
-  cd /etc/nginx/sites-enabled && ln -s ...
+  cd /etc/nginx/sites-enabled
+  ln -s /opt/aprs2net-backend/conf-poller/nginx-vhost.conf t2poll.conf
+  # edit /opt/aprs2net-backend/conf-poller/nginx-vhost.conf to fix the server hostname
+  service nginx restart
 
+Adjust poller config:
+
+  cd /opt/aprs2net-backend/poller
+  cp poller-example.conf poller.conf
+  # edit poller conf
+
+Set up supervisord:
+
+  cd /etc/supervisor/conf.d
+  sudo ln -s /opt/aprs2net-backend/conf-poller/poller-supervisor.conf
+  supervisorctl reload
+
+  
