@@ -23,7 +23,8 @@ DEFAULT_CONF = {
     'poll_interval': '300',
     
     # Portal URL for downloading configs
-    'portal_base_url': 'https://t2dev.aprs2.net'
+    'portal_servers_url': 'https://portal-url.example.com/blah',
+    'portal_rotates_url': 'https://portal-url.example.com/blah'
 }
 
 class Poller:
@@ -48,7 +49,6 @@ class Poller:
             
         self.config.read(config_file)
         
-        self.portal_base_url = self.config.get(CONFIG_SECTION, 'portal_base_url')
         self.poll_interval = self.config.getint(CONFIG_SECTION, 'poll_interval')
         
         # config object for the web UI
@@ -59,7 +59,10 @@ class Poller:
         # redis client
         self.red = aprs2_redis.APRS2Redis()
         self.red.setWebConfig(self.web_config)
-        self.config_manager = aprs2_config.ConfigManager(logging.getLogger('config'), self.red, self.portal_base_url)
+        self.config_manager = aprs2_config.ConfigManager(logging.getLogger('config'),
+        	self.red,
+        	self.config.get(CONFIG_SECTION, 'portal_servers_url'),
+        	self.config.get(CONFIG_SECTION, 'portal_rotates_url'))
         
         # thread limits
         self.threads_now = 0
@@ -192,6 +195,11 @@ class Poller:
                 self.loop_consider_polls()
             time.sleep(1)
 
-poller = Poller()
+
+cfgfile = 'poller.conf'
+if len(sys.argv) > 1:
+    cfgfile = sys.argv[1]
+
+poller = Poller(cfgfile)
 poller.loop()
 

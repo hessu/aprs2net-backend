@@ -32,7 +32,8 @@ DEFAULT_CONF = {
     'min_polled_ok_pct': '55',
     
     # Portal URL for downloading configs
-    'portal_base_url': 'https://t2dev.aprs2.net',
+    'portal_servers_url': 'https://portal-url.example.com/blah',
+    'portal_rotates_url': 'https://portal-url.example.com/blah',
     
     # rotates which are not managed
     'unmanaged_rotates': 'hubs.aprs2.net hub-rotate.aprs2.net',
@@ -62,7 +63,6 @@ class DNSDriver:
             
         self.config.read(config_file)
         
-        self.portal_base_url = self.config.get(CONFIG_SECTION, 'portal_base_url')
         self.dns_master = self.config.get(CONFIG_SECTION, 'dns_master')
         self.poll_interval = self.config.getint(CONFIG_SECTION, 'poll_interval')
         self.dns_zones = self.config.get(CONFIG_SECTION, 'dns_zones').split(' ')
@@ -91,7 +91,10 @@ class DNSDriver:
         # redis client
         self.red = aprs2_redis.APRS2Redis(db=1)
         self.red.setWebConfig(self.web_config)
-        self.config_manager = aprs2_config.ConfigManager(logging.getLogger('config'), self.red, self.portal_base_url)
+        self.config_manager = aprs2_config.ConfigManager(logging.getLogger('config'),
+        	self.red,
+        	self.config.get(CONFIG_SECTION, 'portal_servers_url'),
+        	self.config.get(CONFIG_SECTION, 'portal_rotates_url'))
     
     def fetch_full_status(self):
         """
@@ -529,7 +532,12 @@ class DNSDriver:
         while True:
             self.poll()
             time.sleep(self.poll_interval)
-        
-driver = DNSDriver()
+
+
+cfgfile = 'poller.conf'
+if len(sys.argv) > 1:
+    cfgfile = sys.argv[1]
+
+driver = DNSDriver(cfgfile)
 driver.loop()
 

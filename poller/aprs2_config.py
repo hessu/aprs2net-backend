@@ -59,16 +59,15 @@ test_setup = {
 }
 
 class ConfigManager:
-    def __init__(self, log, red, portal_base_url):
+    def __init__(self, log, red, portal_servers_url, portal_rotates_url):
         self.log = log
         self.red = red
         
         self.rhead = {'User-agent': 'aprs2net-ConfigManager/2.0'}
         self.http_timeout = 30
         
-        self.portal_base_url = portal_base_url
-        self.portal_servers_url = '%s/sysop/servers.json' % self.portal_base_url
-        self.portal_rotates_url = '%s/sysop/rotates.json' % self.portal_base_url
+        self.portal_servers_url = portal_servers_url
+        self.portal_rotates_url = portal_rotates_url
         self.config_etag = None
         
         self.shutdown = False
