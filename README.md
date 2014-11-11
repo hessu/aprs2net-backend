@@ -52,3 +52,9 @@ Set up supervisord:
     sudo ln -s /opt/aprs2net-backend/conf-poller/poller-supervisor.conf
     supervisorctl reload
   
+Upgrading:
+
+    cd /opt/aprs2net-backend
+    sudo git fetch
+    sudo git rebase
+
