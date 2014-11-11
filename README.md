@@ -57,4 +57,25 @@ Upgrading:
     cd /opt/aprs2net-backend
     sudo git fetch
     sudo git rebase
+    
+    # restart nginx, if changes were made to its config
+    service nginx restart
+    
+    # restart poller and status web app
+    service supervisor restart
+
+Other operations:
+
+    # to restart just the poller
+    supervisorctl restart a2poller
+    
+    # to restart just the status web app
+    supervisorctl restart a2web
+
+Logs:
+
+/opt/aprs2net-backend/logs contains log files for the web app and the
+poller. /var/log/nginx contains logs of the nginx web server.
+supervisord, which keeps the poller and web app processes running, logs in
+/var/log/supervisor.
 
