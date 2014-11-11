@@ -106,15 +106,15 @@ class ConfigManager:
             r.raise_for_status()
             d = r.content
         except Exception as e:
-            self.log.info("Portal: %s - Connection error: %r", url, e)
-            return False
+            self.log.error("Portal: %s - Connection error: %r", url, e)
+            return (False, None)
             
         t_end = time.time()
         t_dur = t_end - t_start
         
         if r.status_code != 200:
             self.log.error("Portal: %s - Failed download, code: %r", url, r.status_code)
-            return False
+            return (False, None)
         
         new_etag = r.headers.get('etag')
         self.log.info("Portal: Got etag %r", new_etag)
@@ -123,7 +123,7 @@ class ConfigManager:
             j = json.loads(d)
         except Exception as e:
             self.log.error("Portal: JSON parsing failed (%s): %r", url, e)
-            return False
+            return (False, None)
         
         return (j, new_etag)
     
