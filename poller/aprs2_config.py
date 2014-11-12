@@ -153,6 +153,9 @@ class ConfigManager:
         for rid in j:
             #self.log.debug("rotate %s", rid)
             
+            if rid.startswith('t2poll'):
+                continue
+            
             rotate = j.get(rid)
             servers = rotate.get('servers')
             del rotate['servers']
@@ -161,6 +164,8 @@ class ConfigManager:
             
             for id in servers:
                 #self.log.debug("  server %s", id)
+                if id.startswith('T2POLL-'):
+                    continue
                 new = servers.get(id)
                 members[rid].append(id)
                 old = uniqs.get(id)
