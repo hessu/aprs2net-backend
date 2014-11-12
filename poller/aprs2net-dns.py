@@ -294,7 +294,7 @@ class DNSDriver:
             
             # retain some properties
             prev_state = self.red.getServerStatus(id)
-            if status != prev_state.get('status') or not prev_state.get('last_change'):
+            if not prev_state or status != prev_state.get('status') or not prev_state.get('last_change'):
                 m['last_change'] = m.get('last_test')
             else:
                 m['last_change'] = prev_state.get('last_change')
