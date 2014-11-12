@@ -344,7 +344,9 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 		tables = {};
 		for (var i in servers) {
 			var id = servers[i]['config']['id'];
-			//console.log('id ' + id + ' i ' + i);
+			//console.log('id ' + id + ' i ' + i + ' groupmap ' + groupmap[id]);
+			if (groupmap[id] === undefined)
+				continue;
 			if (rotatestat && rotatestat[id] && rotatestat[id]['rotate.aprs2.net']) {
 				servers[i]['rotate'] = 1;
 				//console.log(' --- is in rotate');
