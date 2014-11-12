@@ -75,7 +75,9 @@ class Poller:
         self.rates_cache = {}
         
         # IP address => server ID map
-        self.address_map = self.red.getAddressMap()
+        self.address_map = {}
+        self.address_map_refresh_t = 0
+        self.address_map_refresh_int = 300
     
     def perform_poll(self, server):
         """
@@ -187,12 +189,27 @@ class Poller:
                 
         self.threads = threads_left
     
+    def load_address_map(self):
+        """
+        Get a new address map, if necessary
+        """
+        now = time.time()
+        if now > self.address_map_refresh_t or now < self.address_map_refresh_t - self.address_map_refresh_int:
+            self.log.info("Refreshing address map")
+            # Get a fresh address map
+            self.address_map = self.red.getAddressMap()
+            self.address_map_refresh_t = now + self.address_map_refresh_int
+        
+    
     def loop(self):
         """
         Main polling loop
         """
         
         while True:
+            # consider reloading address_map
+            self.load_address_map()
+            
             # reap old threads
             self.loop_reap_old_threads()
             
