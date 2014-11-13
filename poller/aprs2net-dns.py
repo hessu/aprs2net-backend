@@ -426,6 +426,8 @@ class DNSDriver:
             
             if serv.get('out_of_service') or serv.get('deleted'):
                 names_cnamed[fqdn] = 1
+                if fqdn.startswith('t2poll'):
+                    self.log.error('Oops, marking %s CNAMED: %r', fqdn, serv)
             else:
                 if not fqdn in names:
                     names[fqdn] = { 'v4': [], 'v6': [] }
@@ -441,7 +443,10 @@ class DNSDriver:
         # Add CNAMEs to rotate, but only for names which did not get A records
         for fqdn in names_cnamed:
             if fqdn not in names:
-                self.dns_push(fqdn, fqdn, cname=self.master_rotate)
+                if fqdn.startswith('t2poll-'):
+                    self.log.error('Oops, trying to do a CNAME for a t2poll server!')
+                else:
+                    self.dns_push(fqdn, fqdn, cname=self.master_rotate)
         
     def dns_pick_zone(self, fqdn):
         """
