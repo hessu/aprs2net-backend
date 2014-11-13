@@ -102,7 +102,10 @@ class ConfigManager:
         t_start = time.time()
         try:
             # TODO: Enable CA verification again!
-            r = requests.get(url, headers=self.rhead, timeout=self.http_timeout, verify=False)
+            req_headers = self.rhead.copy()
+            if self.config_etag:
+                req_headers['If-None-Match'] = self.config_etag
+            r = requests.get(url, headers=req_headers, timeout=self.http_timeout, verify=False)
             r.raise_for_status()
             d = r.content
         except Exception as e:
@@ -111,6 +114,10 @@ class ConfigManager:
             
         t_end = time.time()
         t_dur = t_end - t_start
+        
+        if r.status_code == 304:
+            self.log.error("Portal: %s - %r: Not modified (cache hit)", url, r.status_code)
+            return (False, None)
         
         if r.status_code != 200:
             self.log.error("Portal: %s - Failed download, code: %r", url, r.status_code)
