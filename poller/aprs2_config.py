@@ -117,7 +117,11 @@ class ConfigManager:
             return (False, None)
         
         new_etag = r.headers.get('etag')
-        self.log.info("Portal: Got etag %r", new_etag)
+        if new_etag != None and new_etag == self.config_etag:
+            self.log.info("Portal: Cache hit for config etag %r, no need to process new config", new_etag)
+            return (False, new_etag)
+            
+        self.log.info("Portal: Got new etag %r", new_etag)
         
         try:
             j = json.loads(d)
