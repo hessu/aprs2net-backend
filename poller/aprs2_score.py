@@ -43,6 +43,12 @@ class Score:
         # It will be divided by the number of APRS-IS ports successfully polled (ipv4, ipv6: 2)
         self.aprsis_rtt_mul = 40
         
+        # Uplink uptime penalty time range, in seconds.
+        # If uplink has been established recently, it is sometimes a sign that
+        # the uplink is unstable and flapping due to a bad network connection.
+        # Give a bit of penalty for 0 ... N seconds of uplink uptime.
+        self.uplink_uptime_penalty_time = 900 # 15 minutes
+        
         # poll time, in seconds (float), per address family ("ipv4", "ipv6")
         self.poll_t_14580 = {}
         
@@ -126,6 +132,20 @@ class Score:
             	penalty = (score_range - uptime) / score_range * uptime_max_penalty
             	uptime_s = dur_str(uptime)
                 self.score_add('uptime', penalty, uptime_s)
+        
+        #
+        # Uplink uptime
+        #
+        # If the server's uplink has only been up for a short while, it may be
+        # that it's flapping up and down. Give a bit of penalty.
+        ups = props.get('uplinks', [])
+        
+        if len(ups) > 0:
+            upl = ups[0]
+            uplink_uptime = upl.get('up', 0)
+            if uplink_uptime < self.uplink_uptime_penalty_time:
+                penalty = self.uplink_uptime_penalty_time - uplink_uptime
+                self.score_add('uplink_uptime', penalty, dur_str(uplink_uptime))
         
         return self.score
 
