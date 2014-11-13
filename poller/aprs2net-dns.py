@@ -304,7 +304,11 @@ class DNSDriver:
                 tdif = m['last_test'] - prev_state['last_test']
                 if tdif > 0 and tdif < self.poll_interval * 3:
                     m['avail_7'], m['avail_30'] = self.red.updateAvail(id, tdif, m['status'] == 'ok')
-                    
+                else:
+                    self.log.debug("tdif %d not good, using old availability stats", tdif)
+                    m['avail_7'] = prev_state.get('avail_7')
+                    m['avail_30'] = prev_state.get('avail_30')
+                        
             self.log.debug("merged status for %s: %r", id, m)
             self.red.setServerStatus(id, m)
         
