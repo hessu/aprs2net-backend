@@ -25,7 +25,7 @@ import dns.update
 CONFIG_SECTION = 'dns'
 DEFAULT_CONF = {
     # Server polling interval
-    'poll_interval': '60',
+    'poll_interval': '120',
     
     'max_test_result_age': '660',
     'min_polled_servers': '80',
@@ -298,7 +298,13 @@ class DNSDriver:
                 m['last_change'] = m.get('last_test')
             else:
                 m['last_change'] = prev_state.get('last_change')
-                
+            
+            # update availability statistics
+            if prev_state and 'last_test' in prev_state and 'last_test' in m:
+                tdif = m['last_test'] - prev_state['last_test']
+                if tdif > 0 and tdif < self.poll_interval * 3:
+                    m['avail_7'], m['avail_30'] = self.red.updateAvail(id, tdif, m['status'] == 'ok')
+                    
             self.log.debug("merged status for %s: %r", id, m)
             self.red.setServerStatus(id, m)
         
@@ -323,7 +329,7 @@ class DNSDriver:
         # Push the addresses of individual servers
         self.update_dns_hosts(servers, merged_status)
         
-        self.log.info("participating servers: %r", participating_servers)
+        #self.log.debug("participating servers: %r", participating_servers)
         self.red.storeRotateStatus(participating_servers)
     
     def update_dns_rotate(self, domain, domain_conf, status, servers, participating_servers):
