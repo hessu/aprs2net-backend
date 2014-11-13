@@ -222,6 +222,8 @@ class DNSDriver:
             merged_scorebase = {}
             avg_scorebase = {}
             
+            props_any = None # we accept properties from anyone that can give them
+            
             for site in status_set[id]:
                 stat = status_set[id][site]
                 
@@ -243,6 +245,7 @@ class DNSDriver:
                 props = stat.get('props', {})
                 
                 if props != None and 'score' in props:
+                    props_any = props
                     scores.append(props['score'])
                     score_sum += props['score']
                     if 'scorebase' in props:
@@ -271,8 +274,12 @@ class DNSDriver:
             	m['merged_scorebase'] = merged_scorebase
             
             if latest:
-                m['props'] = latest.get('props')
+                if 'props' in latest:
+                    m['props'] = latest.get('props')
                 m['last_test'] = latest.get('last_test')
+            
+            if not 'props' in m and props_any != None:
+                m['props'] = props_any
             
             if errors:
                 m['errors'] = [[k, errors[k]] for k in errors]
