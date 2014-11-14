@@ -238,7 +238,6 @@ class DNSDriver:
                     if latest_ok == None or latest_ok.get('last_test', 0) < stat.get('last_test', 0):
                         latest_ok = stat
                 else:
-                    score_sum += 1000.0
                     if latest_fail == None or latest_fail.get('last_test', 0) < stat.get('last_test', 0):
                         latest_fail = stat
                 

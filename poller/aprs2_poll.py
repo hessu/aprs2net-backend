@@ -111,7 +111,7 @@ class Poll:
         
         return "unknown"
     
-    def poll(self):
+    def poll_main(self):
         """
         Run a polling round.
         """
@@ -174,11 +174,19 @@ class Poll:
         if not self.check_uplink():
             return False
         
+        return True
+    
+    def poll(self):
+        success = self.poll_main()
+        
+        if success != True:
+            self.score.score_add('server-fail', 1000, '1000')
+            
         self.properties['score'] = self.score.get(self.properties)
         self.properties['scorebase'] = self.score.score_components
-        self.log.info("%s: Server OK, score %.1f: %r", self.id, self.properties['score'], self.score.score_components)
+        self.log.info("%s: Server %s, score %.1f: %r", 'OK' if success else 'FAIL', self.id, self.properties['score'], self.score.score_components)
         
-        return True
+        return success
     
     def check_properties(self):
         """
