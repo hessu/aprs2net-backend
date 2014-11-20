@@ -450,7 +450,7 @@ class DNSDriver:
             # TODO - use correct domain part!
             fqdn = serv.get('host') + '.' + serv.get('domain', '.')
             
-            if serv.get('out_of_service') or serv.get('deleted'):
+            if serv.get('out_of_service') or serv.get('deleted') or merged_status.get(s, {}).get('status') != 'ok':
                 names_cnamed[fqdn] = 1
                 if fqdn.startswith('t2poll'):
                     self.log.error('Oops, marking %s CNAMED: %r', fqdn, serv)
