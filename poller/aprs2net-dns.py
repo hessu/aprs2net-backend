@@ -269,9 +269,6 @@ class DNSDriver:
                 'c_res': len(status_set[id])
             }
             
-            if merged_scorebase:
-            	m['merged_scorebase'] = merged_scorebase
-            
             if latest:
                 if 'props' in latest:
                     m['props'] = latest.get('props')
@@ -291,13 +288,6 @@ class DNSDriver:
             #if latest_fail:
             #    m['s_fail'] = latest_fail
             
-            # start off with arithmetic mean of scores... later, figure out
-            # something more sensible
-            if len(scores) > 0:
-                m['score'] = score_sum / len(scores)
-                if m['props']:
-                    m['props']['score'] = m['score']
-            
             # retain some properties
             prev_state = self.red.getServerStatus(id)
             if not prev_state or status != prev_state.get('status') or not prev_state.get('last_change'):
@@ -306,15 +296,45 @@ class DNSDriver:
                 m['last_change'] = prev_state.get('last_change')
             
             # update availability statistics
+            server = servers.get(id)
             if prev_state and 'last_test' in prev_state and 'last_test' in m:
                 tdif = m['last_test'] - prev_state['last_test']
-                if tdif > 0 and tdif < self.poll_interval * 3:
-                    m['avail_7'], m['avail_30'] = self.red.updateAvail(id, tdif, m['status'] == 'ok')
+                m['avail_7'] = prev_state.get('avail_7')
+                m['avail_30'] = prev_state.get('avail_30')
+                    
+                if server and server.get('out_of_service', False):
+                    self.log.debug("server out_of_service, not updating availability stats")
                 else:
-                    self.log.debug("tdif %d not good, using old availability stats", tdif)
-                    m['avail_7'] = prev_state.get('avail_7')
-                    m['avail_30'] = prev_state.get('avail_30')
-                        
+                    if tdif > 0 and tdif < self.poll_interval * 3:
+                        m['avail_7'], m['avail_30'] = self.red.updateAvail(id, tdif, m['status'] == 'ok')
+                    else:
+                        self.log.debug("tdif %d not good, using old availability stats", tdif)
+            
+            # calculate availability penalty for score
+            availability_score = 0
+            if 'avail_7' in m and m['avail_7'] < 99.0:
+                availability_score = min((100.0 - m['avail_7']) * 50.0, 400)
+            
+            # start off with arithmetic mean of scores... later, figure out
+            # something more sensible
+            if len(scores) > 0:
+                m['score'] = score_sum / len(scores)
+                if availability_score > 0:
+                    m['score'] += availability_score
+                    merged_scorebase['master'] = { "availability": [availability_score, "%.1f %%" % m['avail_7'] ] }
+                if m['props']:
+                    m['props']['score'] = m['score']
+                # just for the heading on the merged scorebase table, this needs to have
+                # all the score components
+                merged_score_keys = {}
+                for n in merged_scorebase:
+                    for k in merged_scorebase[n]:
+                        merged_score_keys[k] = 1
+                m['merged_score_keys'] = sorted(merged_score_keys.keys())
+            
+            if merged_scorebase:
+            	m['merged_scorebase'] = merged_scorebase
+            
             self.log.debug("merged status for %s: %r", id, m)
             self.red.setServerStatus(id, m)
         

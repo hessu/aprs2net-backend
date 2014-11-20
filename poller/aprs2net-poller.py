@@ -126,10 +126,13 @@ class Poller:
             state['last_change'] = now
         
         # update availability statistics
-        if 'last_test' in state:
-            tdif = now - state['last_test']
-            if tdif > 0 and tdif < self.poll_interval * 3:
-                state['avail_7'], state['avail_30'] = self.red.updateAvail(server['id'], tdif, state['status'] == 'ok')
+        if server.get('out_of_service', False):
+            log.info("%s: Server is marker do be out of service, not updating availability statistics", server['id'])
+        else:
+            if 'last_test' in state:
+                tdif = now - state['last_test']
+                if tdif > 0 and tdif < self.poll_interval * 3:
+                    state['avail_7'], state['avail_30'] = self.red.updateAvail(server['id'], tdif, state['status'] == 'ok')
         
         state['errors'] = p.errors
         state['last_test'] = now

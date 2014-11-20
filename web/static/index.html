@@ -52,9 +52,9 @@
 <li class="list-group-item" ng-show="shownServer.status.merged_scorebase">
 	<b>Scoring components</b>
 	<table class='table table-condensed table-striped' style='width: auto;'>
-	<tr><th>poller</th><th ng-repeat="(k, v) in shownServer.status.props.scorebase">{{ k }}</th></tr>
+	<tr><th>poller</th><th ng-repeat="k in shownServer.status.merged_score_keys">{{ k }}</th></tr>
 	<tr ng-repeat="(p, a) in shownServer.status.merged_scorebase"><td>{{ p }}</td>
-		<td ng-repeat="(k, v) in shownServer.status.props.scorebase">{{ shownServer.status.merged_scorebase[p][k][1] }}<br />
+		<td ng-repeat="k in shownServer.status.merged_score_keys">{{ shownServer.status.merged_scorebase[p][k][1] }}<br />
 			+ {{ shownServer.status.merged_scorebase[p][k][0] | number : 1 }}</td></tr>
 	</table>
 	</li>
