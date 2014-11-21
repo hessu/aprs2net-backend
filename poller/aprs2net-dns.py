@@ -312,8 +312,8 @@ class DNSDriver:
             
             # calculate availability penalty for score
             availability_score = 0
-            if 'avail_7' in m and m['avail_7'] < 99.0:
-                availability_score = min((100.0 - m['avail_7']) * 50.0, 400)
+            if 'avail_7' in m and m['avail_7'] < 99.98:
+                availability_score = min((100.0 - m['avail_7']) * 300.0, 400)
             
             # start off with arithmetic mean of scores... later, figure out
             # something more sensible
@@ -321,7 +321,7 @@ class DNSDriver:
                 m['score'] = score_sum / len(scores)
                 if availability_score > 0:
                     m['score'] += availability_score
-                    merged_scorebase['master'] = { "availability": [availability_score, "%.1f %%" % m['avail_7'] ] }
+                    merged_scorebase['master'] = { "availability": [availability_score, "%.3f %%" % m['avail_7'] ] }
                 if m['props']:
                     m['props']['score'] = m['score']
                 # just for the heading on the merged scorebase table, this needs to have
