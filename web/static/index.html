@@ -35,7 +35,7 @@
 	<span ng:class="shownServer.status.status == 'ok' ? 'glyphicon glyphicon-ok' : 'glyphicon glyphicon-fire'"></span>
 	<span>  {{ shownServer.config.fqdn }}  </span>
 	<span ng-show="shownServer.status.props.score"> <span><span class='glyphicon glyphicon-stats'></span> score {{ shownServer.status.props.score | number : 1 }}</span></span>
-	<span ng-show="shownServer.status.avail_30">  availability {{ shownServer.status.avail_30 | number : 3 }} %/30 days, {{ shownServer.status.avail_7 | number : 3 }} %/7 days</span></span>
+	<span ng-show="shownServer.status.avail_30">  availability {{ shownServer.status.avail_30 | number : 3 }} %/30 days, {{ shownServer.status.avail_3 | number : 3 }} %/3 days</span></span>
 	<span ng-show="shownServer.config.out_of_service">  <a href="#" class="btn btn-warning btn-xs active warning" role="button" style="cursor: default;">Out of service</a></span>
 	<span class='pull-right'>
 		<span class='glyphicon glyphicon-list' ng:click="showLog = !showLog"></span><span class='pull-right glyphicon glyphicon-remove' ng:click="shownServer = 0"></span>
@@ -84,7 +84,7 @@
 	<td class="text-right">{{ s.status.props.rate_bytes_out | number : 0 }}</td>
 	<td ng-show="cfg.master" class="text-right">{{ s.status.c }}</td>
 	<td class="text-right">{{ s.status.props.score | number : 0 }}</td>
-	<td class="text-right">{{ s.status.avail_7 | number : 2 }} %</td>
+	<td class="text-right">{{ s.status.avail_3 | number : 2 }} %</td>
 	<td><span ng-show="s.config.out_of_service">serviced </span><span ng-repeat="e in s.status.errors">{{ e[0] }} </span></td>
 	</tr>
 </table>

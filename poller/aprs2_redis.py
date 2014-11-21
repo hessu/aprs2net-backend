@@ -235,9 +235,9 @@ class APRS2Redis:
     	downtime_30 = lsum(downvals)
     	avail_30 = float(uptime_30) / (uptime_30 + downtime_30) * 100.0
     	
-    	uptime_7 = lsum(upvals[0:7])
-    	downtime_7 = lsum(downvals[0:7])
-    	avail_7 = float(uptime_7) / (uptime_7 + downtime_7) * 100.0
+    	uptime_3 = lsum(upvals[0:3])
+    	downtime_3 = lsum(downvals[0:3])
+    	avail_3 = float(uptime_3) / (uptime_3 + downtime_3) * 100.0
     	
     	print "uptime %d seconds, downtime %d seconds - availability %.1f %%" \
     	    % (uptime_30, downtime_30, avail_30)
@@ -247,5 +247,5 @@ class APRS2Redis:
     	delkeys.extend(['%s.%d.down' % (id, now_day - i*86400) for i in range(31, 38)])
     	self.red.hdel(kAvail, delkeys)
     	
-    	return (avail_7, avail_30)
+    	return (avail_3, avail_30)
     

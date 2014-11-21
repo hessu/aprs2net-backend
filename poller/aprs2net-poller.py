@@ -132,7 +132,7 @@ class Poller:
             if 'last_test' in state:
                 tdif = now - state['last_test']
                 if tdif > 0 and tdif < self.poll_interval * 3:
-                    state['avail_7'], state['avail_30'] = self.red.updateAvail(server['id'], tdif, state['status'] == 'ok')
+                    state['avail_3'], state['avail_30'] = self.red.updateAvail(server['id'], tdif, state['status'] == 'ok')
         
         state['errors'] = p.errors
         state['last_test'] = now

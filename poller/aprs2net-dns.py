@@ -8,6 +8,7 @@ import sys
 import traceback
 import types
 import socket
+import math
 from urlparse import urlparse
 
 import requests
@@ -299,21 +300,21 @@ class DNSDriver:
             server = servers.get(id)
             if prev_state and 'last_test' in prev_state and 'last_test' in m:
                 tdif = m['last_test'] - prev_state['last_test']
-                m['avail_7'] = prev_state.get('avail_7')
+                m['avail_3'] = prev_state.get('avail_3')
                 m['avail_30'] = prev_state.get('avail_30')
                     
                 if server and server.get('out_of_service', False):
                     self.log.debug("server out_of_service, not updating availability stats")
                 else:
                     if tdif > 0 and tdif < self.poll_interval * 3:
-                        m['avail_7'], m['avail_30'] = self.red.updateAvail(id, tdif, m['status'] == 'ok')
+                        m['avail_3'], m['avail_30'] = self.red.updateAvail(id, tdif, m['status'] == 'ok')
                     else:
                         self.log.debug("tdif %d not good, using old availability stats", tdif)
             
             # calculate availability penalty for score
             availability_score = 0
-            if 'avail_7' in m and m['avail_7'] < 99.98:
-                availability_score = min((100.0 - m['avail_7']) * 300.0, 400)
+            if 'avail_3' in m and m['avail_3'] != None and m['avail_3'] < 99.98:
+                availability_score = min(math.log((100.0-m['avail_3'])*1000+1)*90, 500)
             
             # start off with arithmetic mean of scores... later, figure out
             # something more sensible
@@ -321,7 +322,7 @@ class DNSDriver:
                 m['score'] = score_sum / len(scores)
                 if availability_score > 0:
                     m['score'] += availability_score
-                    merged_scorebase['master'] = { "availability": [availability_score, "%.3f %%" % m['avail_7'] ] }
+                    merged_scorebase['master'] = { "availability": [availability_score, "%.3f %%" % m['avail_3'] ] }
                 if m['props']:
                     m['props']['score'] = m['score']
                 # just for the heading on the merged scorebase table, this needs to have
