@@ -236,7 +236,7 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 		}
 			
 		cols.push([ 'status.props.score', 'Score' ],
-			[ 'status.avail_30', 'Avail' ],
+			[ 'status.avail_3', 'Avail' ],
 			[ 'status.props.info', 'Info' ]
 		);
 		$scope.columns = cols;
