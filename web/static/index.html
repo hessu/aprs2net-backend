@@ -74,7 +74,7 @@
 
 <tr ng-repeat="s in group | orderBy : sort.column : sort.descending" ng-click="rowClick(s);"
 	ng-class="{info: s.rotate==1, success: s.status.status=='ok', danger: s.status.status=='fail' && !s.config.out_of_service, warning: s.config.out_of_service, keydown: s.duration==-1}">
-	<td><a target="_blank" rel="nofollow" href="http://{{ s.config.ipv4 }}:14501/">{{ s.config.id }}</a></td>
+	<td ng-class="{info: s.rotate_reg==1}"><a target="_blank" rel="nofollow" href="http://{{ s.config.ipv4 }}:14501/">{{ s.config.id }}</a></td>
 	<td>{{ s.status.props.soft }} {{ s.status.props.vers }}</td>
 	<td>{{ s.status.props.os }}</td>
 	<td>{{ s.status.last_test | datetime }}</td>
