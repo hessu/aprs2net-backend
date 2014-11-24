@@ -37,7 +37,7 @@ DEFAULT_CONF = {
     'portal_rotates_url': 'https://portal-url.example.com/blah',
     
     # rotates which are not managed
-    'unmanaged_rotates': 'hubs.aprs2.net hub-rotate.aprs2.net',
+    'unmanaged_rotates': 'hubs.aprs2.net hub-rotate.aprs2.net cwop.aprs.net rotate.aprs.net',
     
     # DNS TTL
     'dns_ttl': '600',
