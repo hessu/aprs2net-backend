@@ -95,7 +95,8 @@ class DNSDriver:
         self.config_manager = aprs2_config.ConfigManager(logging.getLogger('config'),
         	self.red,
         	self.config.get(CONFIG_SECTION, 'portal_servers_url'),
-        	self.config.get(CONFIG_SECTION, 'portal_rotates_url'))
+        	self.config.get(CONFIG_SECTION, 'portal_rotates_url'),
+        	self.unmanaged_rotates)
     
     def fetch_full_status(self):
         """

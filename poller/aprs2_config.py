@@ -59,7 +59,7 @@ test_setup = {
 }
 
 class ConfigManager:
-    def __init__(self, log, red, portal_servers_url, portal_rotates_url):
+    def __init__(self, log, red, portal_servers_url, portal_rotates_url, unmanaged_rotates = {}):
         self.log = log
         self.red = red
         
@@ -69,6 +69,7 @@ class ConfigManager:
         self.portal_servers_url = portal_servers_url
         self.portal_rotates_url = portal_rotates_url
         self.config_etag = None
+        self.unmanaged_rotates = unmanaged_rotates
         
         self.shutdown = False
         
@@ -205,10 +206,14 @@ class ConfigManager:
             ip4 = c.get('ipv4')
             ip6 = c.get('ipv6')
             if ip4 == None:
-               self.log.info("Server has no IPv4 address: %s", id)
-               self.red.delPollQ(id)
-               self.red.delServer(id)
-               continue
+                self.log.info("Server has no IPv4 address: %s", id)
+                self.red.delPollQ(id)
+                self.red.delServer(id)
+                continue
+            
+            for m in c.get('member', []):
+                if not m in self.unmanaged_rotates:
+                    c['show_members'] = 1;
             
             self.red.storeServer(c)
             polled[id] = 1

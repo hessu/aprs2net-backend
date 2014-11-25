@@ -31,7 +31,7 @@
 
 <div class="row" id='popup1-content' ng-show='shownServer.config' ng-cloak>
 <ul class="list-group">
-<li class="list-group-item" ng:class="shownServer.status.status == 'ok' ? 'list-group-item-success' : 'list-group-item-danger'"><b>{{ shownServer.config.id }}</b>
+<li class="list-group-item" ng:class="shownServer.status.status == 'ok' ? 'list-group-item-success' : 'list-group-item-danger'"><b><a target="_blank" rel="nofollow" href="http://{{ shownServer.config.ipv4 }}:14501/">{{ shownServer.config.id }}</a></b>
 	<span ng:class="shownServer.status.status == 'ok' ? 'glyphicon glyphicon-ok' : 'glyphicon glyphicon-fire'"></span>
 	<span>  {{ shownServer.config.fqdn }}  </span>
 	<span ng-show="shownServer.status.props.score"> <span><span class='glyphicon glyphicon-stats'></span> score {{ shownServer.status.props.score | number : 1 }}</span></span>
@@ -58,7 +58,7 @@
 			+ {{ shownServer.status.merged_scorebase[p][k][0] | number : 1 }}</td></tr>
 	</table>
 	</li>
-<li class="list-group-item" ng-show="rotatestat">
+<li class="list-group-item" ng-show="rotatestat && shownServer.config.show_members">
 	<b>Rotates configured for this server, and their current members</b>
 	<table class='table table-condensed table-striped' style='width: auto;'>
 	<tr ng-repeat="r in shownServer.config.member">
