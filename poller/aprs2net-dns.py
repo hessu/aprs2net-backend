@@ -388,11 +388,11 @@ class DNSDriver:
         scored_order_v4 = sorted(members_ok_v4, key=lambda x:status.get(x).get('score'))
         scored_order_v6 = sorted(members_ok_v6, key=lambda x:status.get(x).get('score'))
         
-        # Adjust the sizes of rotates: Number of entries * 0.7, so that
+        # Adjust the sizes of rotates: Number of entries * 0.55, so that
         # load balancing happens even in smaller rotates (the few servers with
         # the worst score are left out).
-        v4_limit = int(round(len(scored_order_v4) * 0.7))
-        v6_limit = int(round(len(scored_order_v6) * 0.7))
+        v4_limit = int(round(len(scored_order_v4) * 0.55))
+        v6_limit = int(round(len(scored_order_v6) * 0.55))
         
         # Maximum limit for the sizes of rotates
         # The DNS reply packet needs to be <= 512 bytes, since there are still
@@ -400,9 +400,9 @@ class DNSDriver:
         v4_limit = min(v4_limit, 8)
         v6_limit = min(v6_limit, 3)
         
-        # Have at least 3 addresses in the rotate, anyway.
-        v4_limit = max(v4_limit, 3)
-        v6_limit = max(v6_limit, 3)
+        # Have at least 2 addresses in the rotate, anyway.
+        v4_limit = max(v4_limit, 2)
+        v6_limit = max(v6_limit, 2)
         
         limited_order_v4 = scored_order_v4[0:v4_limit]
         limited_order_v6 = scored_order_v6[0:v6_limit]
