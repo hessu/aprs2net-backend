@@ -58,6 +58,15 @@
 			+ {{ shownServer.status.merged_scorebase[p][k][0] | number : 1 }}</td></tr>
 	</table>
 	</li>
+<li class="list-group-item" ng-show="rotatestat">
+	<b>Rotates configured for this server, and their current members</b>
+	<table class='table table-condensed table-striped' style='width: auto;'>
+	<tr ng-repeat="r in shownServer.config.member">
+		<td>{{r}}</td>
+		<td><span ng-repeat="id in rotateMem[r]" ng-class="{bold: id == shownServer.config.id}"> {{id}}</span></td>
+		</tr>
+	</table>
+	</li>
 <li class="list-group-item list-group-item-danger" ng-show="shownServer.status.errors"><div ng-repeat="e in shownServer.status.errors">[{{ e[0] }}] {{ e[1] }}</div></li>
 <li class="list-group-item poll-log" ng-show="showLog && shownLog"><pre>{{ shownLog.log }}</pre></li>
 </ul>

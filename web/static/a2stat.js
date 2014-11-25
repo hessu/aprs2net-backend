@@ -355,13 +355,29 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 				//console.log(' --- is in rotate');
 			}
 			servermap[id] = i;
-			groupidmap[id] = groups[groupmap[id]].length
+			groupidmap[id] = groups[groupmap[id]].length;
 			groups[groupmap[id]].push(servers[i]);
 			//console.log("   " + id + " pushed to " + groupmap[id] + " at position " + groupidmap[id] + " " + JSON.stringify(servers[i]));
 		}
 		
 		$scope.groups = groups;
 		$scope.rotates = d['rotates'];
+		$scope.servers = servers;
+		if (rotatestat) {
+			$scope.rotatestat = rotatestat;
+			
+			var m = {};
+			for (var s in rotatestat) {
+				for (var n in rotatestat[s]) {
+					if (!m[n]) {
+						m[n] = [ s ];
+					} else {
+						m[n].push(s);
+					}
+				}
+			}
+			$scope.rotateMem = m;
+		}
 		
 		summary_update();
 		
