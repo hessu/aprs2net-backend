@@ -220,23 +220,28 @@ class APRS2Redis:
     	    hkey = '%s.%d.down' % (id, now_day)
     	    
     	self.red.hincrby(kAvail, hkey, seconds)
-    	print "availability: %s for %d seconds" % (hkey, seconds)
+    	#print "availability: %s for %d seconds" % (hkey, seconds)
     	
     	# calculate 30-day availability
     	upkeys = ['%s.%d.up' % (id, now_day - i*86400) for i in range(0, 30)]
-    	print "upkeys: %r" % upkeys
+    	#print "upkeys: %r" % upkeys
     	upvals = self.red.hmget(kAvail, upkeys)
     	
     	downkeys = ['%s.%d.down' % (id, now_day - i*86400) for i in range(0, 30)]
-    	print "downkeys: %r" % downkeys
+    	#print "downkeys: %r" % downkeys
     	downvals = self.red.hmget(kAvail, downkeys)
     	
     	uptime_30 = lsum(upvals)
     	downtime_30 = lsum(downvals)
     	avail_30 = float(uptime_30) / (uptime_30 + downtime_30) * 100.0
     	
-    	uptime_3 = lsum(upvals[0:3])
-    	downtime_3 = lsum(downvals[0:3])
+    	# For 3-day availability, we take today, 2 days before, and a fraction
+    	# of the 3rd day, fraction depending on how far into 'today' we are.
+    	# This will soften the fluctuation at midnight UTC, when a full 24 hours of
+    	# availability was removed from the equation.
+    	first_day_fraction =  (1.0 - (now % 86400 / 86400.0))
+    	uptime_3 = lsum(upvals[0:3]) + lsum(upvals[3:4]) * first_day_fraction
+    	downtime_3 = lsum(downvals[0:3]) + lsum(downvals[3:4]) * first_day_fraction
     	avail_3 = float(uptime_3) / (uptime_3 + downtime_3) * 100.0
     	
     	print "uptime %d seconds, downtime %d seconds - availability %.1f %%" \
