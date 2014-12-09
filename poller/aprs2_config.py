@@ -35,27 +35,11 @@ test_setup = {
         'host': 'aprsnz',
         'ipv4': '125.236.199.246'
     },
-    'T2ARK': {
-        'host': 'arkansas',
-        'ipv4': '67.14.192.41'
-    },
-    'T2AUSTRIA': {
-        'host': 'austria',
-        'ipv4': '194.208.144.169'
-    },
     'T2BASEL': {
         'host': 'basel',
         'ipv4': '185.14.156.135',
         'ipv6': '2a03:b240:100::1'
     },
-    'T2BC': {
-        'host': 'bc',
-        'ipv4': '206.12.104.10'
-    },
-    'T2BELGIUM': {
-        'host': 'belgium',
-        'ipv4': '193.190.240.225'
-    }
 }
 
 class ConfigManager:
