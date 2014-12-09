@@ -80,7 +80,6 @@ class NagiosDriver:
     	alert_recipients = {}
     	
     	for id in conf:
-    	    print "id: %s" % id
     	    s = conf.get(id)
     	    ipv4 = s.get('ipv4')
     	    if ipv4 == None:
