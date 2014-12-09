@@ -5,8 +5,7 @@ import logging
 import logging.config
 import ConfigParser
 import sys
-import traceback
-import types
+import os
 
 import aprs2_config
 
@@ -18,7 +17,6 @@ DEFAULT_CONF = {
     
     # Portal URL for downloading configs
     'portal_servers_url': 'https://portal-url.example.com/blah',
-    
 }
 
 class NagiosDriver:
@@ -46,6 +44,8 @@ class NagiosDriver:
         
         self.client_key = self.config.get(CONFIG_SECTION, 'client_key')
         self.client_cert = self.config.get(CONFIG_SECTION, 'client_cert')
+        
+        self.write_nagios_config = self.config.get(CONFIG_SECTION, 'write_nagios_config')
         
         self.config_etag = None
         self.config_manager = aprs2_config.ConfigManager(logging.getLogger('config'),
@@ -115,8 +115,7 @@ class NagiosDriver:
         Write a nagios configuration
         """
         
-        of = "nagios_t2_servers.conf"
-        tmpf = "%s.tmp" % of
+        tmpf = "%s.tmp" % self.write_nagios_config
         
         try:
             f = open(tmpf, 'w+')
@@ -124,6 +123,13 @@ class NagiosDriver:
             f.close()
         except IOError:
             self.log.error("Failed to write to %s", tmpf)
+            return
+        
+        try:
+            os.rename(tmpf, self.write_nagios_config)
+        except IOError:
+            self.log.error("Failed to rename %s to %s", tmpf, self.write_nagios_config)
+            return
         
         
     def loop(self):
