@@ -47,6 +47,8 @@ class NagiosDriver:
         
         self.write_nagios_config = self.config.get(CONFIG_SECTION, 'write_nagios_config')
         
+        self.ignored_serverid_prefixes = self.config.get(CONFIG_SECTION, 'ignored_serverid_prefixes').split(',')
+        
         self.config_etag = None
         self.config_manager = aprs2_config.ConfigManager(logging.getLogger('config'),
         	None,
@@ -80,6 +82,13 @@ class NagiosDriver:
     	alert_recipients = {}
     	
     	for id in conf:
+    	    ign = False
+    	    for i in self.ignored_serverid_prefixes:
+    	        if id.startswith(i):
+    	            ign = True
+    	    if ign:
+    	        continue
+    	    
     	    s = conf.get(id)
     	    ipv4 = s.get('ipv4')
     	    if ipv4 == None:
@@ -87,7 +96,7 @@ class NagiosDriver:
     	    
     	    if s.get('deleted') == True:
     	        continue
-    	    
+    	        
     	    contact_groups = [ 't2-obsessed' ]
     	    
     	    print "%r" % s
