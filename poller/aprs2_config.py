@@ -43,7 +43,7 @@ test_setup = {
 }
 
 class ConfigManager:
-    def __init__(self, log, red, portal_servers_url, portal_rotates_url, unmanaged_rotates = {}):
+    def __init__(self, log, red, portal_servers_url, portal_rotates_url, unmanaged_rotates = {}, credentials = None):
         self.log = log
         self.red = red
         
@@ -54,6 +54,7 @@ class ConfigManager:
         self.portal_rotates_url = portal_rotates_url
         self.config_etag = None
         self.unmanaged_rotates = unmanaged_rotates
+        self.client_credentials = credentials
         
         self.shutdown = False
         
@@ -95,7 +96,7 @@ class ConfigManager:
             req_headers = self.rhead.copy()
             if self.config_etag:
                 req_headers['If-None-Match'] = self.config_etag
-            r = requests.get(url, headers=req_headers, timeout=self.http_timeout, verify=False)
+            r = requests.get(url, headers=req_headers, timeout=self.http_timeout, verify=False, cert=self.client_credentials)
             r.raise_for_status()
             d = r.content
         except Exception as e:
