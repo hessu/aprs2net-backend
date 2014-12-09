@@ -99,6 +99,7 @@ class NagiosDriver:
     	    s = s % (id, ipv4)
     	    
     	    host_defs.append(s)
+    	    ids.append(id)
     	
     	s = "define hostgroup {\n" \
     	  + "    hostgroup_name t2-servers\n" \
@@ -106,7 +107,7 @@ class NagiosDriver:
     	  + "    members %s\n" \
     	  + "}\n"
     	
-    	host_defs.append(s % ",".join(conf.keys()))
+    	host_defs.append(s % ",".join(ids))
     	
     	self.write_out(host_defs, alert_recipients)
         
