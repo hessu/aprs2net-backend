@@ -85,24 +85,45 @@ class NagiosDriver:
     	    if ipv4 == None:
     	        continue
     	    
+    	    contact_groups = [ 't2-obsessed' ]
+    	    
+    	    print "%r" % s
+    	    
     	    if s.get('email_alerts'):
     	        em = s.get('email')
     	        if em:
     	            alert_recipients[id] = (em)
+    	            contact_groups.append('t2-c-%s' % id)
+    	            st = "define contact {\n" \
+    	               + "    contact_name sysop_%s\n" \
+    	               + "    alias Sysop of %s\n" \
+    	               + "    service_notification_period 24x7\n" \
+    	               + "    host_notification_period        24x7\n" \
+    	               + "    service_notification_options    w,u,c,r\n" \
+    	               + "    host_notification_options       d,r\n" \
+    	               + "    service_notification_commands   notify-service-by-email\n" \
+    	               + "    host_notification_commands      notify-host-by-email\n" \
+    	               + "    email %s\n" \
+    	               + "}\n"
+    	               
+    	            st = st % (id, id, em)
+    	            host_defs.append(st)
+    	                                                               
     	    
-    	    s = "define host {\n" \
+    	    st = "define host {\n" \
     	    	+ "    use t2server-host\n" \
     	    	+ "    host_name %s\n" \
     	    	+ "    address %s\n" \
+    	    	+ "    contact_groups %s\n" \
     	    	+ "}\n"
-    	    s = s % (id, ipv4)
+    	    st = st % (id, ipv4, ",".join(contact_groups))
     	    
-    	    host_defs.append(s)
+    	    host_defs.append(st)
     	    ids.append(id)
     	
     	s = "define hostgroup {\n" \
-    	  + "    hostgroup_name t2-servers\n" \
-    	  + "    alias T2 servers\n" \
+    	  + "    hostgroup_name t2-is-servers\n" \
+    	  + "    alias T2 APRS-IS servers\n" \
     	  + "    members %s\n" \
     	  + "}\n"
     	
