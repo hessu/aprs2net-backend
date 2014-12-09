@@ -63,6 +63,7 @@ class Poller:
         	self.red,
         	self.config.get(CONFIG_SECTION, 'portal_servers_url'),
         	self.config.get(CONFIG_SECTION, 'portal_rotates_url'))
+        self.config_manager.start()
         
         # thread limits
         self.threads_now = 0

@@ -97,6 +97,7 @@ class DNSDriver:
         	self.config.get(CONFIG_SECTION, 'portal_servers_url'),
         	self.config.get(CONFIG_SECTION, 'portal_rotates_url'),
         	self.unmanaged_rotates)
+        self.config_manager.start()
     
     def fetch_full_status(self):
         """

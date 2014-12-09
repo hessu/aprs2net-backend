@@ -57,11 +57,16 @@ class ConfigManager:
         
         self.shutdown = False
         
+        self.log.info("ConfigManager initialized")
+    
+    def start(self):
+        """
+        Start background thread for config management
+        """
         self.cfg_thread = threading.Thread(target=self.cfg_loop)
         self.cfg_thread.daemon = True
         self.cfg_thread.start()
-        
-        self.log.info("ConfigManager initialized")
+        self.log.info("ConfigManager thread started")
     
     def cfg_loop(self):
         """
