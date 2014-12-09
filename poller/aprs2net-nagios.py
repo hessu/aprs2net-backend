@@ -85,6 +85,9 @@ class NagiosDriver:
     	    if ipv4 == None:
     	        continue
     	    
+    	    if s.get('deleted') == True:
+    	        continue
+    	    
     	    contact_groups = [ 't2-obsessed' ]
     	    
     	    print "%r" % s
