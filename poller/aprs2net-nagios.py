@@ -99,7 +99,7 @@ class NagiosDriver:
     	        
     	    contact_groups = [ 't2-obsessed' ]
     	    
-    	    print "%r" % s
+    	    #print "%r" % s
     	    
     	    if s.get('email_alerts'):
     	        em = s.get('email')
@@ -147,6 +147,8 @@ class NagiosDriver:
         """
         Write a nagios configuration
         """
+        
+        self.log.info("Writing out a new configuration: %s", self.write_nagios_config)
         
         tmpf = "%s.tmp" % self.write_nagios_config
         
