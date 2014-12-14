@@ -12,6 +12,7 @@ import json
 import threading
 import time
 import random
+import re
 
 POLL_INTERVAL = 2*60
 
@@ -84,18 +85,61 @@ class ConfigManager:
                 
             time.sleep(POLL_INTERVAL)
     
-    def fetch_config(self, url, etag=None):
+    def login(self, user, passwd):
+        """
+        Try user/password auth
+        """
+        
+        self.log.info("Logging in to portal ...")
+        url = 'https://t2sysop.aprs2.net/accounts/login/'
+        s = requests.Session()
+        try:
+            r = s.get(url, timeout=self.http_timeout, verify=True)
+            r.raise_for_status()
+            d = r.content
+        except Exception as e:
+            self.log.error("Portal login step 1: %s - Connection error: %r", url, e)
+            return None
+        
+        # <input type='hidden' name='csrfmiddlewaretoken' value='f03Wi2WTERnpMx1Po8nweb2ySuU1oJ4U' />
+        csrf_re = re.compile("input .*name='csrfmiddlewaretoken'.*value='(.*?)'")
+        match = csrf_re.search(d)
+        if match == None:
+            self.log.error("Portal login: CSRF token not found")
+            return
+        csrftoken = match.group(1)
+        
+        #self.log.debug("Login: CSRF token: '%s'", csrftoken)
+        #self.log.debug("Cookies: %r", s.cookies)
+        
+        s.headers = {'Referer': url}
+        login_payload = { 'username': user, 'password': passwd, 'csrfmiddlewaretoken': csrftoken, 'next': '' }
+        try:
+            r = s.post(url, data=login_payload, timeout=self.http_timeout, verify=True)
+            r.raise_for_status()
+            d = r.content
+            #print d
+        except Exception as e:
+            self.log.error("Portal login step 2: %s - Connection error: %r", url, e)
+            return None
+        
+        return s
+    
+    def fetch_config(self, url, etag=None, session=None):
         """
         Fetch one config object
         """
         self.log.info("Fetching %s", url)
+        
+        if session == None:
+            session = requests.Session()
         
         t_start = time.time()
         try:
             req_headers = self.rhead.copy()
             if self.config_etag:
                 req_headers['If-None-Match'] = self.config_etag
-            r = requests.get(url, headers=req_headers, timeout=self.http_timeout, verify=True, cert=self.client_credentials)
+            r = session.get(url, headers=req_headers, timeout=self.http_timeout, verify=True, cert=self.client_credentials)
             r.raise_for_status()
             d = r.content
         except Exception as e:
@@ -132,6 +176,7 @@ class ConfigManager:
         """
         Fetch configuration from the portal
         """
+        
         self.log.info("Fetching current server list from portal...")
         
         j, new_etag = self.fetch_config(self.portal_rotates_url, self.config_etag)

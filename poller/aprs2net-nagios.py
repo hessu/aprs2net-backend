@@ -17,6 +17,11 @@ DEFAULT_CONF = {
     
     # Portal URL for downloading configs
     'portal_servers_url': 'https://portal-url.example.com/blah',
+    
+    'client_key': None,
+    'client_cert': None,
+    'client_user': None,
+    'client_pass': None,
 }
 
 class NagiosDriver:
@@ -42,8 +47,10 @@ class NagiosDriver:
         
         self.poll_interval = self.config.getint(CONFIG_SECTION, 'poll_interval')
         
-        self.client_key = self.config.get(CONFIG_SECTION, 'client_key')
-        self.client_cert = self.config.get(CONFIG_SECTION, 'client_cert')
+        self.client_key = self.config.get(CONFIG_SECTION, 'client_key', None)
+        self.client_cert = self.config.get(CONFIG_SECTION, 'client_cert', None)
+        self.client_user = self.config.get(CONFIG_SECTION, 'client_user')
+        self.client_pass = self.config.get(CONFIG_SECTION, 'client_pass')
         
         self.write_nagios_config = self.config.get(CONFIG_SECTION, 'write_nagios_config')
         
@@ -62,9 +69,15 @@ class NagiosDriver:
         Do a single polling round
         """
         
+        session = None
+        if self.client_user and self.client_pass:
+            session = self.config_manager.login(self.client_user, self.client_pass)
+            if session == None:
+                return
+        
         self.log.info("Fetching current server list from portal...")
         
-        j, new_etag = self.config_manager.fetch_config(self.config_manager.portal_servers_url, self.config_etag)
+        j, new_etag = self.config_manager.fetch_config(self.config_manager.portal_servers_url, self.config_etag, session=session)
         if j == False:
             return False
         
