@@ -92,11 +92,10 @@ class ConfigManager:
         
         t_start = time.time()
         try:
-            # TODO: Enable CA verification again!
             req_headers = self.rhead.copy()
             if self.config_etag:
                 req_headers['If-None-Match'] = self.config_etag
-            r = requests.get(url, headers=req_headers, timeout=self.http_timeout, verify=False, cert=self.client_credentials)
+            r = requests.get(url, headers=req_headers, timeout=self.http_timeout, verify=True, cert=self.client_credentials)
             r.raise_for_status()
             d = r.content
         except Exception as e:
