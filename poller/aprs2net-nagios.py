@@ -111,6 +111,7 @@ class NagiosDriver:
     	        continue
     	        
     	    contact_groups = [ 't2-obsessed' ]
+    	    contacts = ""
     	    
     	    #print "%r" % s
     	    
@@ -118,7 +119,6 @@ class NagiosDriver:
     	        em = s.get('email')
     	        if em:
     	            alert_recipients[id] = (em)
-    	            contact_groups.append('t2-c-%s' % id)
     	            st = "define contact {\n" \
     	               + "    contact_name sysop_%s\n" \
     	               + "    alias Sysop of %s\n" \
@@ -133,12 +133,13 @@ class NagiosDriver:
     	               
     	            st = st % (id, id, em)
     	            host_defs.append(st)
-    	                                                               
+    	            contacts = "    contacts sysop_%s\n" % id
     	    
     	    st = "define host {\n" \
     	    	+ "    use t2server-host\n" \
     	    	+ "    host_name %s\n" \
     	    	+ "    address %s\n" \
+    	    	+ contacts \
     	    	+ "    contact_groups %s\n" \
     	    	+ "}\n"
     	    st = st % (id, ipv4, ",".join(contact_groups))
