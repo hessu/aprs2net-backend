@@ -113,15 +113,18 @@ class Poller:
             state['props'] = props
         else:
             state['status'] = 'fail'
+            old_props = state.get('props', {})
+            
             if props:
                 state['props'] = props
             else:
-                old_props = state.get('props', {})
-                if old_props:
-                    keep_props = {}
-                    for i in ('type', 'soft', 'vers', 'os', 'id'):
-                        keep_props[i] = old_props.get(i)
-                    state['props'] = keep_props
+                state['props'] = props = {}
+            
+            # if some server config info is present in old props, but not in the new ones, keep them
+            if old_props:
+                for i in ('type', 'soft', 'vers', 'os', 'id'):
+                    if i not in props:
+                        props[i] = old_props.get(i)
         
         if state['status'] != prev_status or 'last_change' not in state:
             state['last_change'] = now
