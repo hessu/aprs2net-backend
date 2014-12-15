@@ -273,8 +273,8 @@ class Poll:
         try:
             r = requests.get(self.status_url, headers=self.rhead, timeout=self.http_timeout)
             d = r.content
-        except Exception as e:
-            return self.error('web-http-fail', "%s: HTTP status page 14501 /: Connection error: %s" % (self.id, str(e)))
+        except Exception, e:
+            return self.error('web-http-fail', "%s: HTTP status page 14501 /: Connection error: %s" % (self.id, e))
             
         t_end = time.time()
         t_dur = t_end - t_start
@@ -373,8 +373,8 @@ class Poll:
         try:
             r = requests.get('%s%s' % (self.status_url, 'detail.xml'), headers=self.rhead, timeout=self.http_timeout)
             d = r.content
-        except Exception as e:
-            return self.error('web-http-fail', "%s: HTTP status page 14501 /detail.xml: Connection error: %s" % (self.id, str(e)))
+        except Exception, e:
+            return self.error('web-http-fail', "%s: HTTP status page 14501 /detail.xml: Connection error: %s" % (self.id, e))
             
         if r.status_code == 404:
             self.log.info("%s: detail.xml 404 Not Found - not javAPRSSrvr 4", self.id)
@@ -562,8 +562,8 @@ class Poll:
         try:
             r = requests.get('%s%s' % (self.status_url, 'status.json'), headers=self.rhead, timeout=self.http_timeout)
             d = r.content
-        except Exception as e:
-            return self.error('web-http-fail', "%s: HTTP status page 14501 /status.json: Connection error: %s" % (self.id, str(e)))
+        except Exception, e:
+            return self.error('web-http-fail', "%s: HTTP status page 14501 /status.json: Connection error: %s" % (self.id, e))
             
         self.log.debug("%s: HTTP GET /status.json returned: %r", self.id, r.status_code)
         
@@ -721,8 +721,8 @@ class Poll:
                 t_start = time.time()
                 try:
                     r = requests.get(url, headers=self.rhead, timeout=self.http_timeout)
-                except Exception as e:
-                    self.log.info("%s: HTTP submit 8080: Connection error: %r", self.id, e)
+                except Exception, e:
+                    self.log.info("%s: HTTP submit 8080: Connection error: %s", self.id, e)
                     continue
                     
                 t_dur = time.time() - t_start
