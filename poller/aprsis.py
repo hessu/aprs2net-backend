@@ -85,6 +85,9 @@ class TCPPoll:
         if serverid_back != serverid:
             return self.error('serverid', "APRS-IS login response for '%s' has unexpected server ID: '%s'" % (serverid, serverid_back))
         
+        if login_ok.find('adjunct "filter default" filter') > 0:
+            return self.error('defaultfilter', "APRS-IS login response for '%s' says a default filter is configured" % (serverid,))
+        
         self.log.info("%s: APRS-IS TCP OK: %s port %s", self.id, host, port)
         
         return ['ok', 'Works fine!']
