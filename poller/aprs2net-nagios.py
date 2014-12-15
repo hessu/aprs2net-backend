@@ -123,8 +123,8 @@ class NagiosDriver:
     	               + "    alias Sysop of %s\n" \
     	               + "    service_notification_period 24x7\n" \
     	               + "    host_notification_period        24x7\n" \
-    	               + "    service_notification_options    w,u,c,r\n" \
-    	               + "    host_notification_options       d,r\n" \
+    	               + "    service_notification_options    w,u,c,r,f\n" \
+    	               + "    host_notification_options       d,r,f\n" \
     	               + "    service_notification_commands   notify-service-by-email\n" \
     	               + "    host_notification_commands      notify-host-by-email\n" \
     	               + "    email %s\n" \
