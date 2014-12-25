@@ -378,9 +378,17 @@ class DNSDriver:
             and status.get(i).get('status') == 'ok' and status.get(i).get('score') != None
             and servers.get(i) and servers.get(i).get('out_of_service') != True
             and servers.get(i).get('deleted') != True]
-            
+        
         members_ok_v4 = [i for i in members_ok if servers.get(i).get('ipv4')]
         members_ok_v6 = [i for i in members_ok if servers.get(i).get('ipv6')]
+        
+        # For the master rotate, we only accept servers which support HTTP submit on port 8080.
+        if domain == self.master_rotate:
+            members_ok_v4 = [i for i in members_ok_v4 if status.get(i).get('props', {}).get('submit-http-8080-ipv4')]
+            # v6 polling for HTTP is not done currently, since for some reason
+            # python-requests does not accept IPv6 literal addresses in an URL yet.
+            # Just use the v4 polling result for now and assume IPv6 HTTP is OK.
+            members_ok_v6 = [i for i in members_ok_v6 if status.get(i).get('props', {}).get('submit-http-8080-ipv4')]
         
         self.log.debug("Members: %r", members)
         self.log.debug("Members ok ip4: %r", members_ok_v4)
