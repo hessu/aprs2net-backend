@@ -67,6 +67,7 @@ li.poll-log pre {
 	z-index: 100;
 	margin: 0;
 	padding: 15px;
+	max-width: 90%;
 }
 
 #popup1-content > .list-group {
