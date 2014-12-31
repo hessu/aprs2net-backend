@@ -93,6 +93,14 @@ function last_events(n)
 	return a;
 }
 
+var reply = function(req, res, r) {
+	res.setHeader('Cache-Control', 'no-cache');
+	if (req.query['cb'])
+		res.jsonp(r)
+	else
+		res.json(r);
+}
+
 function upd_response(seq, res)
 {
 	var seq_dif = evq_seq - seq;
@@ -261,15 +269,13 @@ var handle_slog = function(req, res) {
 	var id = req.query['id'];
 	if (id == undefined) {
 		util.log("no server ID given");
-		res.setHeader('Cache-Control', 'no-cache');
-		res.json({ 'result': 'fail' });
+		reply(req, res, { 'result': 'fail' });
 		return;
 	}
 	
 	red.hget(kServerLog, id, function (err, log) {
 		log = JSON.parse(log);
-		res.setHeader('Cache-Control', 'no-cache');
-		res.json({ 'result': 'ok', 't': log['t'], 'log': log['log'] });
+		reply(req, res, { 'result': 'ok', 't': log['t'], 'log': log['log'] });
 	});
 };
 
