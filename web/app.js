@@ -26,6 +26,7 @@ kChannelStatusDns = 'aprs2.chStatusDns';
 kWebConfig = 'aprs2.webconfig';
 kRotate = 'aprs2.rotate';
 kRotateStatus = 'aprs2.rotateStatus';
+kRotateStats = 'aprs2.rotateStats';
 
 if (ops['dns_driver']) {
 	redis_dbid = 1;
@@ -95,9 +96,9 @@ function last_events(n)
 
 var reply = function(req, res, r) {
 	res.setHeader('Cache-Control', 'no-cache');
-	if (req.query['cb'])
+	if (req.query['callback']) {
 		res.jsonp(r)
-	else
+	} else
 		res.json(r);
 }
 
@@ -279,6 +280,22 @@ var handle_slog = function(req, res) {
 	});
 };
 
+var handle_rstats = function(req, res) {
+	util.log("rstats req: " + JSON.stringify(req.query));
+	
+	var rot = req.query['rot'];
+	if (rot == undefined) {
+		util.log("no rotate hostname given");
+		reply(req, res, { 'result': 'fail' });
+		return;
+	}
+	
+	red.hget(kRotateStats, rot, function (err, stats) {
+		stats = JSON.parse(stats);
+		reply(req, res, { 'result': 'ok', 'stats': stats });
+	});
+};
+
 /* Set up the redis client */
 red = redis.createClient();
 red.on("error", function (err) {
@@ -314,6 +331,7 @@ function init() {
 	app.get('/api/full', handle_full_status); /* fetch full server list */
 	app.get('/api/upd', handle_upd); /* fetch updates to servers */
 	app.get('/api/slog', handle_slog); /* fetch a poll log of a server */
+	app.get('/api/rstats', handle_rstats); /* fetch a poll log of a server */
 	
 	var listen_port = parseInt(ops['port']);
 
