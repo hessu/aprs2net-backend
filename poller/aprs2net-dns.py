@@ -446,6 +446,12 @@ class DNSDriver:
         
         self.dns_push(domain, domain, v4_addrs=v4_addrs, v6_addrs=v6_addrs)
         
+        self.store_rotate_stats(domain, members_ok, members_not_deleted, status)
+
+    def store_rotate_stats(self, domain, members_ok, members_not_deleted, status):
+        """
+        Calculate and store some statistics for a rotate
+        """
         total_clients = rate_bytes_in = rate_bytes_out = 0
         for i in members_ok:
             p = status.get(i).get('props', {})
