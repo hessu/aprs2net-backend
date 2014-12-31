@@ -21,6 +21,7 @@ kChannelStatusDns = 'aprs2.chStatusDns'
 kWebConfig = 'aprs2.webconfig'
 kRotate = 'aprs2.rotate'
 kRotateStatus = 'aprs2.rotateStatus'
+kRotateStats = 'aprs2.rotateStats'
 
 def lsum(list):
     d = 0
@@ -202,6 +203,12 @@ class APRS2Redis:
     	Store a single rotate status
     	"""
     	return self.red.set(kRotateStatus, json.dumps(rot))
+    
+    def storeRotateStats(self, domain, stats):
+    	"""
+    	Store statistics for a single rotate
+    	"""
+    	return self.red.hset(kRotateStats, domain, json.dumps(stats))
     
     def updateAvail(self, id, seconds, isUp):
     	"""

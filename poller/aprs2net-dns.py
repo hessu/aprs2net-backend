@@ -374,10 +374,12 @@ class DNSDriver:
         
         # which members are OK, and which of them have IPv4 or IPv6 addresses available
         members = domain_conf.get('members')
-        members_ok = [i for i in members if status.get(i)
-            and status.get(i).get('status') == 'ok' and status.get(i).get('score') != None
-            and servers.get(i) and servers.get(i).get('out_of_service') != True
-            and servers.get(i).get('deleted') != True]
+        members_not_deleted = [i for i in members
+            if servers.get(i) and servers.get(i).get('deleted') != True]
+        members_ok = [i for i in members_not_deleted
+            if status.get(i) and status.get(i).get('status') == 'ok' and status.get(i).get('score') != None
+            and servers.get(i).get('out_of_service') != True]
+            
         
         members_ok_v4 = [i for i in members_ok if servers.get(i).get('ipv4')]
         members_ok_v6 = [i for i in members_ok if servers.get(i).get('ipv6')]
@@ -443,6 +445,22 @@ class DNSDriver:
         v6_addrs = [servers.get(i).get('ipv6') for i in limited_order_v6]
         
         self.dns_push(domain, domain, v4_addrs=v4_addrs, v6_addrs=v6_addrs)
+        
+        total_clients = rate_bytes_in = rate_bytes_out = 0
+        for i in members_ok:
+            p = status.get(i).get('props', {})
+            total_clients += p.get('clients', 0)
+            rate_bytes_in += p.get('rate_bytes_in', 0)
+            rate_bytes_out += p.get('rate_bytes_in', 0)
+            
+        self.log.info("%s: %d clients on %d/%d servers, total data rate %.0f bytes/sec ount",
+            domain, total_clients, len(members_ok), len(members_not_deleted), rate_bytes_out)
+        self.red.storeRotateStats(domain, {
+            'clients': total_clients,
+            'servers_ok': len(members_ok), 'servers': len(members_not_deleted),
+            'rate_bytes_out': rate_bytes_out,
+            'rate_bytes_in': rate_bytes_in
+        })
     
     def update_dns_hosts(self, servers, merged_status):
         """
