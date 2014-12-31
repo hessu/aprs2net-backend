@@ -364,6 +364,8 @@ class DNSDriver:
         
         #self.log.debug("participating servers: %r", participating_servers)
         self.red.storeRotateStatus(participating_servers)
+        
+        self.update_total_stats(servers, merged_status)
     
     def update_dns_rotate(self, domain, domain_conf, status, servers, participating_servers):
         """
@@ -448,6 +450,21 @@ class DNSDriver:
         
         self.store_rotate_stats(domain, members_ok, members_not_deleted, status)
 
+    def update_total_stats(self, servers, status):
+        """
+        Calculate and store statistics for the whole server set
+        """
+    
+        # which servers are OK
+        members = servers.keys()
+        members_not_deleted = [i for i in members
+            if servers.get(i) and servers.get(i).get('deleted') != True]
+        members_ok = [i for i in members_not_deleted
+            if status.get(i) and status.get(i).get('status') == 'ok' and status.get(i).get('score') != None
+            and servers.get(i).get('out_of_service') != True]
+        
+        self.store_rotate_stats('total', members_ok, members_not_deleted, status)
+        
     def store_rotate_stats(self, domain, members_ok, members_not_deleted, status):
         """
         Calculate and store some statistics for a rotate
@@ -457,10 +474,10 @@ class DNSDriver:
             p = status.get(i).get('props', {})
             total_clients += p.get('clients', 0)
             rate_bytes_in += p.get('rate_bytes_in', 0)
-            rate_bytes_out += p.get('rate_bytes_in', 0)
+            rate_bytes_out += p.get('rate_bytes_out', 0)
             
-        self.log.info("%s: %d clients on %d/%d servers, total data rate %.0f bytes/sec ount",
-            domain, total_clients, len(members_ok), len(members_not_deleted), rate_bytes_out)
+        self.log.info("%s: %d clients on %d/%d servers, total data rate %.0f/%.0f bytes/sec in/out",
+            domain, total_clients, len(members_ok), len(members_not_deleted), rate_bytes_in, rate_bytes_out)
         self.red.storeRotateStats(domain, {
             'clients': total_clients,
             'servers_ok': len(members_ok), 'servers': len(members_not_deleted),
