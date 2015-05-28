@@ -605,6 +605,12 @@ class DNSDriver:
         # pollers which appear to be faulty
         status_set = self.fetch_full_status()
         
+        # If no server status is available from any of the pollers, throw
+        # in the towel so that we won't CNAME all servers to rotate
+        if not status_set:
+            self.log.error("Failed to get any server status information - no pollers reachable?")
+            return
+        
         # Fetch setup from database (maintaned by config manager thread)
         servers = self.red.getServers()
         
