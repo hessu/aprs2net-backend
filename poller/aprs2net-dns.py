@@ -39,6 +39,10 @@ DEFAULT_CONF = {
     # rotates which are not managed
     'unmanaged_rotates': 'hubs.aprs2.net hub-rotate.aprs2.net cwop.aprs.net rotate.aprs.net',
     
+    'dns_master': '',
+    'dns_zones': '',
+    'dns_tsig_key': '',
+    
     # DNS TTL
     'dns_ttl': '600',
 }
@@ -74,9 +78,13 @@ class DNSDriver:
         self.min_polled_servers = self.config.getint(CONFIG_SECTION, 'min_polled_servers')
         self.min_polled_ok_pct = self.config.getint(CONFIG_SECTION, 'min_polled_ok_pct')
         
-        self.dns_keyring = dns.tsigkeyring.from_text({ 'aprs2net-dns.' : self.config.get(CONFIG_SECTION, 'dns_tsig_key') })
+        key = self.config.get(CONFIG_SECTION, 'dns_tsig_key')
+        self.dns_keyring = None
+        if key:
+            self.dns_keyring = dns.tsigkeyring.from_text({ 'aprs2net-dns.' : key })
+            
         self.dns_ttl = self.config.getint(CONFIG_SECTION, 'dns_ttl')
-
+        
         self.rhead = {'User-agent': 'aprs2net-dns/2.0'}
         self.http_timeout = 10.0
         
@@ -542,6 +550,10 @@ class DNSDriver:
         Push a set of A and AAAA records to the DNS, but only if they've
         changed.
         """
+        # Only push updates if DNS server is configured
+        if not (self.dns_master and self.dns_zones and self.dns_keyring):
+            return
+            
         # check if there are any changes, sort the addresses first so that
         # scoring order changes do not cause cache misses
         v4_addrs = sorted(v4_addrs)
