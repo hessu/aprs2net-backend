@@ -334,6 +334,10 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 			//console.log("  group " + i + ": " + n.id);
 			var rot = d['rotates'][n.id];
 			
+			if (!rot) {
+				rot = { 'members': {} };
+			}
+			
 			for (var id in rot['members']) {
 				groupmap[rot['members'][id]] = groups.length;
 				//console.log("     - " + rot['members'][id]);
