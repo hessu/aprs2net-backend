@@ -397,12 +397,8 @@ class Poll:
         """
         
         try:
-            # Python decodes the UTF-8 to an Unicode string, and etree does not
-            # appreciate a pre-decoded Unicode string having an encoding parameter
-            # in it. Work around: encode back to UTF-8.
-            e = d.encode('utf-8')
-            parser = etree.XMLParser(ns_clean=True, recover=True, encoding='utf-8')
-            root = etree.fromstring(e, parser=parser)
+            parser = etree.XMLParser(ns_clean=True, recover=True)
+            root = etree.fromstring(d, parser=parser)
         except Exception, exp:
             return self.error('web-xml-fail', "detail.xml XML parsing failed: %s" % str(exp))
         
