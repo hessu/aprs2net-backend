@@ -56,7 +56,7 @@ class Score:
         # value is the score penalty given to versions older than this.
         # TODO: make configurable from config file.
         self.version_penalty = {
-        	'aprsc': { '2.0.18': 400 }
+        	'aprsc': { '2.0.18': 700 }
         }
         
         # poll time, in seconds (float), per address family ("ipv4", "ipv6")
