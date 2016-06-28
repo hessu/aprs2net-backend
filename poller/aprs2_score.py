@@ -1,4 +1,6 @@
 
+from distutils.version import LooseVersion
+
 def dur_str(i):
     s = ''
     
@@ -48,6 +50,14 @@ class Score:
         # the uplink is unstable and flapping due to a bad network connection.
         # Give a bit of penalty for 0 ... N seconds of uplink uptime.
         self.uplink_uptime_penalty_time = 900 # 15 minutes
+        
+        # Too old server software version gives penalty.
+        # Configure the map key as minimum software version that is "new enough",
+        # value is the score penalty given to versions older than this.
+        # TODO: make configurable from config file.
+        self.version_penalty = {
+        	'aprsc': { '2.0.18': 400 }
+        }
         
         # poll time, in seconds (float), per address family ("ipv4", "ipv6")
         self.poll_t_14580 = {}
@@ -146,6 +156,20 @@ class Score:
             if uplink_uptime < self.uplink_uptime_penalty_time:
                 penalty = self.uplink_uptime_penalty_time - uplink_uptime
                 self.score_add('uplink_uptime', penalty, dur_str(uplink_uptime))
+        
+        #
+        # Server software version
+        #
+        # If there is a minimum software version configured for the server software,
+        # and the server runs a version older than that, give the given penalty.
+        server_sw = str(props.get('soft'))
+        server_ver = str(props.get('vers'))
+        if server_sw and server_ver:
+            reqs = self.version_penalty.get(server_sw, {})
+            for req_ver in reqs:
+               if LooseVersion(server_ver) < LooseVersion(req_ver):
+                   penalty = reqs.get(req_ver, 1)
+                   self.score_add('version', penalty, server_ver)
         
         return self.score
 
