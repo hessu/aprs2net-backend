@@ -150,7 +150,7 @@ class ConfigManager:
         t_dur = t_end - t_start
         
         if r.status_code == 304:
-            self.log.error("Portal: %s - %r: Not modified (cache hit)", url, r.status_code)
+            self.log.info("Portal: %s - %r: Not modified (cache hit)", url, r.status_code)
             return (False, None)
         
         if r.status_code != 200:

@@ -251,8 +251,8 @@ class APRS2Redis:
     	downtime_3 = lsum(downvals[0:3]) + lsum(downvals[3:4]) * first_day_fraction
     	avail_3 = float(uptime_3) / (uptime_3 + downtime_3) * 100.0
     	
-    	print "uptime %d seconds, downtime %d seconds - availability %.1f %%" \
-    	    % (uptime_30, downtime_30, avail_30)
+    	#print "uptime %d seconds, downtime %d seconds - availability %.1f %%" \
+    	#    % (uptime_30, downtime_30, avail_30)
     	
     	# expire old keys
     	delkeys = ['%s.%d.up' % (id, now_day - i*86400) for i in range(31, 38)]
