@@ -12,6 +12,7 @@ import aprs2_redis
 import aprs2_poll
 import aprs2_config
 import aprs2_logbuf
+import aprs2_graphite
 
 # All configuration variables need to be strings originally.
 CONFIG_SECTION = 'poller'
@@ -141,10 +142,19 @@ class Poller:
         state['errors'] = p.errors
         state['last_test'] = now
         
+        # store state in local database
         self.red.setServerStatus(server['id'], state)
         self.red.storeServerLog(server['id'], { 't': now, 'log': log.buffer_string() })
         self.red.sendServerStatusMessage({ 'config': server, 'status': state })
         
+        # push statistics (through a buffer and thread) to graphite
+        graphite_sender = aprs2_graphite.GraphiteSender(self.log, "server." + server["id"])
+        graphite_sender.send('ok', 1 if state.get('status') == 'ok' else 0)
+        graphite_sender.send('avail_3', state.get('avail_3', 0))
+        for k in ('score',):
+            if k in props:
+                graphite_sender.send(k, props.get(k))
+
     def poll(self, server):
         """
         Poll a single server

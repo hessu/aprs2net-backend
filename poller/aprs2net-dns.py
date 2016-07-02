@@ -16,6 +16,7 @@ import json
 
 import aprs2_redis
 import aprs2_config
+import aprs2_graphite
 
 # dnspython.org
 import dns.query
@@ -346,8 +347,22 @@ class DNSDriver:
             if merged_scorebase:
             	m['merged_scorebase'] = merged_scorebase
             
-            self.log.debug("merged status for %s: %r", id, m)
+            # store state in local database
+            #self.log.debug("merged status for %s: %r", id, m)
             self.red.setServerStatus(id, m)
+            
+            # push statistics (through a buffer and thread) to graphite
+            graphite_sender = aprs2_graphite.GraphiteSender(self.log, "server." + server["id"])
+            graphite_sender.send('merged_ok', 1 if m.get('status') == 'ok' else 0)
+            
+            for k in ('score', 'avail_3'):
+                if k in m:
+                    graphite_sender.send('merged_' + k, m.get(k))
+            
+            if props_any:
+                for k in ('clients', 'total_bytes_in', 'total_bytes_out', 'worst_load'):
+                    if k in props_any:
+                        graphite_sender.send(k, props_any.get(k))
         
         return merged
     
