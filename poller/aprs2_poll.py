@@ -218,6 +218,7 @@ class Poll:
         rkeys = {
             'total_bytes_in': 'rate_bytes_in',
             'total_bytes_out': 'rate_bytes_out',
+            'connects': 'rate_connects',
         }
         
         prev = self.rates_cache.get(self.id)
