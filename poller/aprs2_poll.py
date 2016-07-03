@@ -23,6 +23,7 @@ javap3_re_num = {
     # depending on server's system locale these integers have thousands separators, or not, either '.' or ',', "'", " "
     'clients': re.compile('<TD[^>]*>Current Inbound Connections</TD><TD>([\\d,\\.]+)</TD>'),
     'clients_max': re.compile('<TD[^>]*>Maximum Inbound Connections</TD><TD>([\\d,\\.]+)</TD>'),
+    'connects': re.compile('<TD[^>]*>Total Inbound Connects</TD><TD>([\\d,\\.]+)</TD>'),
     'total_bytes_in': re.compile('<TD[^>]*>Total Bytes In</TD><TD>([^<]+)</TD>'),
     'total_bytes_out': re.compile('<TD[^>]*>Total Bytes Out</TD><TD>([^<]+)</TD>'),
 }
@@ -195,7 +196,7 @@ class Poll:
         
         mandatory = [
             'id', 'os', 'soft', 'vers',
-            'clients', 'clients_max',
+            'clients', 'clients_max', 'connects',
             'total_bytes_in', 'total_bytes_out'
         ]
         
@@ -483,6 +484,8 @@ class Poll:
         clients_tag = root.find('clients')
         if clients_tag == None:
             return self.error('web-parse-fail', "detail.xml: No 'clients' tag")
+            
+        self.properties['connects'] = int(clients_tag.attrib.get('total'))
         
         self.properties['total_bytes_in'] = int(clients_tag.find('rcvdtotals').attrib.get('bytes'))
         self.properties['total_bytes_out'] = int(clients_tag.find('xmtdtotals').attrib.get('bytes'))
@@ -616,6 +619,7 @@ class Poll:
         totals_keys = {
             'clients': 'clients',
             'clients_max': 'clients_max',
+            'connects': 'connects'
         }
         
         if not self.aprsc_get_keys(j_totals, totals_keys, 'totals'):
