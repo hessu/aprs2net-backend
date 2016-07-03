@@ -363,7 +363,7 @@ class DNSDriver:
                     graphite_sender.send('merged_' + k, m.get(k))
             
             if props_any:
-                for k in ('clients', 'total_bytes_in', 'total_bytes_out', 'worst_load'):
+                for k in ('clients', 'rate_bytes_in', 'rate_bytes_out', 'worst_load'):
                     if k in props_any:
                         graphite_sender.send(k, props_any.get(k))
         
