@@ -234,7 +234,7 @@ class DNSDriver:
             merged_scorebase = {}
             avg_scorebase = {}
             
-            props_any = None # we accept properties from anyone that can give them
+            props_any = None # we accept the properties with the latest timestamp
             
             for site in status_set[id]:
                 stat = status_set[id][site]
@@ -242,8 +242,14 @@ class DNSDriver:
                 self.log.debug("status for %s at %s: %r", id, site, stat)
                 
                 status = stat.get('status', 'Unknown')
+                props = stat.get('props', {})
+                
                 if latest == None or latest.get('last_test', 0) < stat.get('last_test', 0):
                     latest = stat
+                    props_any = props
+                
+                if props_any == None and props:
+                    props_any = props
                     
                 if status == 'ok':
                     ok_count += 1
@@ -252,11 +258,8 @@ class DNSDriver:
                 else:
                     if latest_fail == None or latest_fail.get('last_test', 0) < stat.get('last_test', 0):
                         latest_fail = stat
-                
-                props = stat.get('props', {})
-                
+
                 if props != None and 'score' in props:
-                    props_any = props
                     scores.append(props['score'])
                     score_sum += props['score']
                     if 'scorebase' in props:
