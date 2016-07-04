@@ -56,7 +56,7 @@ class Score:
         # value is the score penalty given to versions older than this.
         # TODO: make configurable from config file.
         self.version_penalty = {
-        	'aprsc': { '2.0.18': 700 }
+        	'aprsc': { '2.0.18': None, '2.0.19': 300 }
         }
         
         # poll time, in seconds (float), per address family ("ipv4", "ipv6")
@@ -169,7 +169,26 @@ class Score:
             for req_ver in reqs:
                if LooseVersion(server_ver) < LooseVersion(req_ver):
                    penalty = reqs.get(req_ver, 1)
-                   self.score_add('version', penalty, server_ver)
+                   if penalty != None:
+	                   self.score_add('version', penalty, server_ver)
         
         return self.score
+    
+    def server_version_disallowed(self, props):
+        """
+        Check if the server software version is too old to be allowed on the network.
+        Return True if disallowed.
+        """
+        
+        server_sw = str(props.get('soft'))
+        server_ver = str(props.get('vers'))
+        
+        if server_sw and server_ver:
+            reqs = self.version_penalty.get(server_sw, {})
+            for req_ver in reqs:
+               if LooseVersion(server_ver) < LooseVersion(req_ver):
+                   if reqs.get(req_ver, 1) == None:
+                   	return True
+                   	
+	return False
 

@@ -165,8 +165,10 @@ class Poll:
             break
         
         if ok == False:
-            self.error('web-undetermined', "Server status not determined: %r" % self.id)
-            return False
+            return self.error('web-undetermined', "Server status not determined: %r" % self.id)
+        
+        if self.score.server_version_disallowed(self.properties):
+            return self.error('soft-old', 'Server software too old: needs an upgrade')
         
         # Test that the required APRS-IS services are working
         if not self.service_tests():
