@@ -33,17 +33,17 @@ javap3_re_outbound = re.compile('<TH[^>]*>Outbound Connections</TH>.*?<TR[^>]*>.
 # <TD align=middle>C1BEF0E2</TD>
 # <TD align=middle>Yes</TD>
 # <TD align=middle>aprsc 2.0.11&#8209;g6099cb1</TD>
-# <TD>5d14h00m45.881s</TD>
-# <TD>21,334,472</TD>
-# <TD>498,551</TD>
-# <TD>1,937,147,236</TD>
-# <TD>44,844,765</TD>
-# <TD>32,122</TD>
-# <TD>743</TD>
-# <TD>00.025s</TD>
-# <TD>4,048</TD>
-# <TD>0</TD></TR>
-javap3_re_outbound_line = re.compile('<TR[^>]*><TD[^>]*><A[^>]+>([^/<]+)/([^<]+)</A></TD><TD[^>]*>(.*?)</TD><TD[^>]*>(.*?)</TD><TD[^>]*>(.*?)</TD><TD[^>]*>(.*?)</TD><TD[^>]*>(.*?)</TD>(.*)')
+# <TD>5d14h00m45.881s</TD> (connected uplink)
+# <TD>21,334,472</TD> (Packets Rcvd)
+# <TD>498,551</TD> (Packets Sent)
+# <TD>1,937,147,236</TD> (Bytes Rcvd)
+# <TD>44,844,765</TD> (Bytes Sent)
+# <TD>32,122</TD> (Rcv bps)
+# <TD>743</TD> (Send bps)
+# <TD>00.025s</TD> (Last packet in)
+# <TD>4,048</TD> (Looped)
+# <TD>0</TD></TR> (Queue depth (ms))
+javap3_re_outbound_line = re.compile('<TR[^>]*><TD[^>]*><A[^>]+>([^/<]+)/([^<]+)</A></TD><TD[^>]*>(.*?)</TD><TD[^>]*>(.*?)</TD><TD[^>]*>(.*?)</TD><TD[^>]*>(.*?)</TD><TD>(.*?)</TD><TD>(.*?)</TD><TD>(.*?)</TD><TD>(.*?)</TD><TD>(.*?)</TD><TD>(.*?)</TD><TD>(.*?)</TD>(.*)')
 javap3_re_uptime = re.compile('(\\d+)(\\.\d+){0,1}([dhms])(.*)')
 javap3_re_numeric_sanitize = re.compile('[^\\d]+')
 
@@ -351,15 +351,17 @@ class Poll:
                 haddr = m.group(2)
                 uptime = self.javap3_decode_uptime(m.group(6))
                 rx_packets = javap3_strfloat(m.group(7))
+                rx_last = self.javap3_decode_uptime(m.group(13))
                 id = self.map_addr_id(haddr)
-                self.log.debug("   server: host %s addr %s up %r rx %s id %r", hname, haddr, uptime, rx_packets, id)
-                s = m.group(8)
-                #self.log.debug("   left: %s", s)
+                self.log.debug("   server: host %s addr %s up %r rx_packets %s rx_last %s id %r", hname, haddr, uptime, rx_packets, rx_last, id)
+                s = m.group(14)
+                self.log.debug("   left: %s", s)
                 upl.append({
                     'id': id,
                     'addr_rem': haddr,
                     'up': uptime,
-                    'rx_packets': rx_packets
+                    'rx_packets': rx_packets,
+                    'rx_last': rx_last
                 })
             
             self.properties['uplinks'] = upl
@@ -501,6 +503,8 @@ class Poll:
         clientrcv = clients_tag.findall('clientrcv')
         if clientrcv != None:
             upl = []
+            
+            # current time at the server (sometimes wildly off from real time, when no NTP in use)
             currtime = time_tag.find('current')
             if currtime == None:
                 return self.error('web-parse-fail', "detail.xml: No 'current' time tag found")
@@ -522,6 +526,7 @@ class Poll:
                 rcv = cl.find("rcvdfrom")
                 rem = cl.find("remoteserver")
                 ctime = tm.find("connect")
+                lastlinein = tm.find("lastlinein")
                 
                 if callssid == None or up == None or up.text != "true" or ctime == None:
                     continue
@@ -534,8 +539,13 @@ class Poll:
                 if client_class != "UpstreamClientRcv":
                     continue
                 
+                # uplink connection uptime, convert to seconds
                 ctime = float(ctime.attrib.get("utc"))
                 uptime = (currtime - ctime) / 1000
+                
+                # when data was last received from connection, convert to seconds
+                lastlinein = float(lastlinein.attrib.get("utc"))
+                lastlinein = (currtime - lastlinein) / 1000
                 
                 self.log.debug(" upstream client %s class %s", callssid.text, client_class)
                 
@@ -545,6 +555,7 @@ class Poll:
                     'id': callssid.text,
                     'addr_rem': rem,
                     'up': int(uptime),
+                    'rx_last': lastlinein,
                     'rx_packets': int(rcv.attrib.get('packets', '0')),
                 })
                 
@@ -674,6 +685,7 @@ class Poll:
                     'id': u.get('username'),
                     'addr_rem': u.get('addr_rem'),
                     'up': u.get('since_connect'),
+                    'rx_last': u.get('since_last_read'),
                     'rx_packets': u.get('pkts_rx'),
                 })
             self.properties['uplinks'] = upl
@@ -792,6 +804,9 @@ class Poll:
         uplink_member = uplink_server.get('member', [])
         if required_upstream and required_upstream not in uplink_member:
             return self.error('uplinks-wrong', 'Connected to wrong upstream server')
+        
+        if upl.get('rx_last') > 300:
+            return self.error('uplinks-stuck', 'Uplink stuck: last received data %d seconds ago' % upl.get('rx_last'))
         
         self.log.info('Uplink: Connected to %s [%s]', upl.get('addr_rem'), upl.get('id'))
         
