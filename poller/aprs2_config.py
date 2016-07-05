@@ -262,7 +262,7 @@ class ConfigManager:
             else:
                 if self.red.getPollQ(id) == None:
                     self.log.info("Adding server in poll queue: %s", id)
-                    self.red.setPollQ(id, int(time.time()) + random.randint(0,20))
+                    self.red.setPollQ(id, int(time.time()) + random.randint(0,300))
         
         # TODO: add sanity check for too few servers
         
