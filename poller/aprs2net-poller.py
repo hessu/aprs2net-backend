@@ -68,7 +68,7 @@ class Poller:
         
         # thread limits
         self.threads_now = 0
-        self.threads_max = 16
+        self.threads_max = 32
         self.threads = []
         
         # server software type cache
