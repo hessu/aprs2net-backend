@@ -151,7 +151,7 @@ class Poller:
         graphite_sender = aprs2_graphite.GraphiteSender(self.log, "server." + server["id"])
         graphite_sender.send('ok', 1 if state.get('status') == 'ok' else 0)
         graphite_sender.send('avail_3', state.get('avail_3', 0))
-        for k in ('score',):
+        for k in ('score','ping_loss', 'ping_rtt_avg', 'ping_rtt_max'):
             if k in props:
                 graphite_sender.send(k, props.get(k))
 

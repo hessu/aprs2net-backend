@@ -5,6 +5,8 @@ import json
 import re
 import socket
 from lxml import etree
+from subprocess import Popen, STDOUT, PIPE
+
 
 import aprsis
 import aprs2_score
@@ -118,6 +120,9 @@ class Poll:
         """
         self.log.info("polling %s", self.id)
         self.log.debug("config: %r", self.server)
+        
+        # perform ICMP ECHO round-trip-time + packet loss test
+        self.ping()
         
         # check if we know its software type already
         try_first = self.software_type_cache.get(self.id)
@@ -843,4 +848,37 @@ class Poll:
                     self.score.poll_t_14580[ac] = t_dur
         
         return ok and ok_count > 0
+
+    def ping(self):
+        lines = Popen(["ping", "-i", "1", "-w", "30", "-n", self.server['ipv4']],
+            stdout=PIPE, stderr=STDOUT).communicate()[0].split("\n")
+        
+        if len(lines) < 3:
+            self.log.error("Ping %s failed: %s", self.server['ipv4'], ",".join(lines))
+            return False
+        
+        m = re.search(", (\d+)% packet loss,", lines[-3])
+        if not m:
+            self.log.error("Ping %s failed: %s", self.server['ipv4'], ",".join(lines))
+            return False
+        
+        loss = float(m.group(1))
+        self.properties['ping_loss'] = loss
+        
+        stats = lines[-2]
+        
+        # min/avg/max/mdev = 40.864/41.011/41.150/0.106 ms
+        m = re.search(" = \d+\.\d+/(\d+\.\d+)/(\d+\.\d+)/", stats)
+        if m:
+            rtt_avg = float(m.group(1))
+            rtt_max = float(m.group(2))
+            
+            self.properties['ping_rtt_avg'] = rtt_avg
+            self.properties['ping_rtt_max'] = rtt_max
+            
+            self.log.info("%s: Ping %s: rtt %.1f ms avg, %.1f ms max, loss %.0f %%",
+                    self.id, self.server['ipv4'], rtt_avg, rtt_max, loss)
+        else:
+            self.log.info("%s: Ping %s: loss %.0f %%",
+                    self.id, self.server['ipv4'], loss)
 
