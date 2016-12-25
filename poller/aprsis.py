@@ -6,6 +6,7 @@ APRS-IS testing client for the purpose of checking if a server is working
 import socket
 import re
 
+re_prompt_port_full = re.compile('# Port full')
 re_login_ok = re.compile('# logresp ([^ ]+) ([^, ]+), server ([A-Z0-9\\-]+)')
 
 class TCPPoll:
@@ -66,7 +67,12 @@ class TCPPoll:
         
         if prompt == "":
             return self.error('acl', 'Server closed connection immediately without sending version string (ACL?)')
-            
+        
+        m = re_prompt_port_full.search(prompt)
+        if m != None:
+            self.log.info('%s: Login prompt says port is full: %s', self.id, repr(prompt))
+            return self.error('portfull', "APRS-IS port full, too many clients")
+        
         m = re_login_ok.search(login_ok)
         if m == None:
             self.log.info('%s: Login response not recognized: %s', self.id, repr(login_ok))
