@@ -158,8 +158,7 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 		{ id: 'rotate.aprs.net', name: 'Core' },
 		{ id: 'hubs.aprs2.net', name: 'T2 Hubs' },
 		{ id: 'rotate.aprs2.net', name: 'T2 Leafs' },
-		{ id: 'cwop.aprs.net', name: 'CWOP' },
-		{ id: 'firenet.aprs2.net', name: 'Firenet' }
+		{ id: 'cwop.aprs.net', name: 'CWOP' }
 	];
 	
 	var summary_update = function() {
