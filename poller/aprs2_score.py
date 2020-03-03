@@ -35,7 +35,7 @@ class Score:
         # For each polling time, we set the added score to 0 if the rtt is
         # "good enough" in an attempt to make the playing field level.
         # In seconds.
-        self.rtt_good_enough = 0.4
+        self.rtt_good_enough = 0.6
         
         # Multiply the HTTP RTT by N before adding to score.
         # 50: rtt of 2.4 seconds will add 60 to score.

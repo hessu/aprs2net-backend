@@ -406,7 +406,7 @@ class DNSDriver:
             if servers.get(i) and servers.get(i).get('deleted') != True]
         members_ok = [i for i in members_not_deleted
             if status.get(i) and status.get(i).get('status') == 'ok' and status.get(i).get('score') != None
-            and status.get(i).get('props', {}).get('worst_load') <= 90
+            and status.get(i).get('props', {}).get('worst_load') <= 80
             and servers.get(i).get('out_of_service') != True]
             
         

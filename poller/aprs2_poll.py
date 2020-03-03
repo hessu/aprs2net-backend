@@ -77,7 +77,7 @@ class Poll:
         self.rhead = {'User-agent': 'aprs2net-poller/2.0'}
         self.http_timeout = 5.0
         self.http_got_t = None
-        self.client_cap = 600
+        self.client_cap = 800
         
         self.try_order = ['javap3', 'aprsc', 'javap4']
         
