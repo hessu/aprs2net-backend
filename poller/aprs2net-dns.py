@@ -611,7 +611,7 @@ class DNSDriver:
                 update.add(fqdn, self.dns_ttl, 'aaaa', a.encode('ascii'))
         
         try:
-            response = dns.query.tcp(update, self.dns_master)
+            response = dns.query.tcp(update, self.dns_master, timeout=10)
         except socket.error as e:
             self.log.error("DNS push [%s]: update error, cannot connect to DNS master: %r", logid, e)
             return
