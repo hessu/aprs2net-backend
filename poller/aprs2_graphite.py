@@ -16,7 +16,7 @@ class GraphiteThread(object):
         self.thr = None
         
         
-        self.queue = Queue.Queue(max_queue_size)
+        self.queue = queue.Queue(max_queue_size)
         self.stopping = threading.Event()
         
         self.check_connect()
@@ -44,7 +44,7 @@ class GraphiteThread(object):
                 self.transmit(metric, value)
                 
                 self.queue.task_done()
-            except Queue.Empty:
+            except queue.Empty:
                 pass
             except Exception as e:
                 import traceback

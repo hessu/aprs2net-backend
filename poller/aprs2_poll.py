@@ -281,7 +281,7 @@ class Poll:
         t_start = time.time()
         try:
             r = requests.get(self.status_url, headers=self.rhead, timeout=self.http_timeout)
-            d = r.content
+            d = r.text
         except Exception as e:
             return self.error('web-http-fail', "%s: HTTP status page 14501 /: Connection error: %s" % (self.id, e))
             
@@ -851,7 +851,7 @@ class Poll:
 
     def ping(self):
         lines = Popen(["ping", "-i", "1", "-w", "30", "-n", self.server['ipv4']],
-            stdout=PIPE, stderr=STDOUT).communicate()[0].split("\n")
+            stdout=PIPE, stderr=STDOUT).communicate()[0].decode('UTF-8').split("\n")
         
         if len(lines) < 3:
             self.log.error("Ping %s failed: %s", self.server['ipv4'], ",".join(lines))

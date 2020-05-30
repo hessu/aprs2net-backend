@@ -35,7 +35,7 @@ class APRS2Redis:
         """
         aprs2.net status storage in Redis
         """
-        self.red = redis.Redis(host=host, port=port, db=db)
+        self.red = redis.Redis(host=host, port=port, db=db, charset="utf-8", decode_responses=True)
     
     def setWebConfig(self, conf):
         """
