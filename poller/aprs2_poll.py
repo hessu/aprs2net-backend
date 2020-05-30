@@ -243,12 +243,12 @@ class Poll:
         self.rates_cache[self.id] = prev
     
     def javap3_decode_uptime(self, s):
-    	"""
-    	Decode javaprssrvr3 uptime string
-    	"""
-    	self.log.debug("javap3 uptime: %s", s)
-    	# 132d18h34m27.215s
-    	
+        """
+        Decode javaprssrvr3 uptime string
+        """
+        self.log.debug("javap3 uptime: %s", s)
+        # 132d18h34m27.215s
+        
         mul = {
             'd': 86400,
             'h': 3600,
@@ -257,20 +257,20 @@ class Poll:
         }
         
         up = 0
-    	while True and s != '':
-    	    match = javap3_re_uptime.match(s)
-    	    if match == None:
-    	        break;
-    	    #self.log.debug("  found: %s %s", match.group(1), match.group(3))
-    	    
-    	    m = mul.get(match.group(3))
-    	    if m != None:
-    	        up += int(match.group(1)) * m	
-    	    
-    	    s = match.group(4)
-    	    #self.log.debug("  left: %s", s)
-    	
-    	return up
+        while True and s != '':
+            match = javap3_re_uptime.match(s)
+            if match == None:
+                break;
+            #self.log.debug("  found: %s %s", match.group(1), match.group(3))
+            
+            m = mul.get(match.group(3))
+            if m != None:
+                up += int(match.group(1)) * m
+            
+            s = match.group(4)
+            #self.log.debug("  left: %s", s)
+        
+        return up
     
     def poll_javaprssrvr3(self):
         """
@@ -282,7 +282,7 @@ class Poll:
         try:
             r = requests.get(self.status_url, headers=self.rhead, timeout=self.http_timeout)
             d = r.content
-        except Exception, e:
+        except Exception as e:
             return self.error('web-http-fail', "%s: HTTP status page 14501 /: Connection error: %s" % (self.id, e))
             
         t_end = time.time()
@@ -384,7 +384,7 @@ class Poll:
         try:
             r = requests.get('%s%s' % (self.status_url, 'detail.xml'), headers=self.rhead, timeout=self.http_timeout)
             d = r.content
-        except Exception, e:
+        except Exception as e:
             return self.error('web-http-fail', "%s: HTTP status page 14501 /detail.xml: Connection error: %s" % (self.id, e))
             
         if r.status_code == 404:
@@ -410,7 +410,7 @@ class Poll:
         try:
             parser = etree.XMLParser(ns_clean=True, recover=True)
             root = etree.fromstring(d, parser=parser)
-        except Exception, exp:
+        except Exception as exp:
             return self.error('web-xml-fail', "detail.xml XML parsing failed: %s" % str(exp))
         
         if root == None or len(root) < 1:
@@ -580,7 +580,7 @@ class Poll:
         try:
             r = requests.get('%s%s' % (self.status_url, 'status.json'), headers=self.rhead, timeout=self.http_timeout)
             d = r.content
-        except Exception, e:
+        except Exception as e:
             return self.error('web-http-fail', "%s: HTTP status page 14501 /status.json: Connection error: %s" % (self.id, e))
             
         self.log.debug("%s: HTTP GET /status.json returned: %r", self.id, r.status_code)
@@ -741,7 +741,7 @@ class Poll:
                 t_start = time.time()
                 try:
                     r = requests.get(url, headers=self.rhead, timeout=self.http_timeout)
-                except Exception, e:
+                except Exception as e:
                     self.log.info("%s: HTTP submit 8080: Connection error: %s", self.id, e)
                     continue
                     
