@@ -56,7 +56,7 @@ class Score:
         # value is the score penalty given to versions older than this.
         # TODO: make configurable from config file.
         self.version_penalty = {
-        	'aprsc': { '2.0.18': None, '2.0.19': 300 }
+            'aprsc': { '2.0.18': None, '2.0.19': 300 }
         }
         
         # poll time, in seconds (float), per address family ("ipv4", "ipv6")
@@ -91,7 +91,7 @@ class Score:
             return self.score_max
         
         self.score_add('http_rtt', max(0, self.http_status_t - self.rtt_good_enough) * self.http_rtt_mul,
-        	'%.3f s' % self.http_status_t )
+                '%.3f s' % self.http_status_t )
         
         #
         # APRS-IS
@@ -111,8 +111,7 @@ class Score:
         
         is_score = is_score / len(self.poll_t_14580)
         rtt_avg = rtt_sum / len(self.poll_t_14580)
-        self.score_add('aprsis_rtt', is_score,
-        	'%.3f s' % rtt_avg)
+        self.score_add('aprsis_rtt', is_score, '%.3f s' % rtt_avg)
         
         #
         # Amount of users
@@ -139,8 +138,8 @@ class Score:
             if uptime < 0:
                 uptime = 0
             if uptime < score_range:
-            	penalty = (score_range - uptime) / score_range * uptime_max_penalty
-            	uptime_s = dur_str(uptime)
+                penalty = (score_range - uptime) / score_range * uptime_max_penalty
+                uptime_s = dur_str(uptime)
                 self.score_add('uptime', penalty, uptime_s)
         
         #
@@ -170,7 +169,7 @@ class Score:
                if LooseVersion(server_ver) < LooseVersion(req_ver):
                    penalty = reqs.get(req_ver, 1)
                    if penalty != None:
-	                   self.score_add('version', penalty, server_ver)
+                       self.score_add('version', penalty, server_ver)
         
         return self.score
     
@@ -188,7 +187,7 @@ class Score:
             for req_ver in reqs:
                if LooseVersion(server_ver) < LooseVersion(req_ver):
                    if reqs.get(req_ver, 1) == None:
-                   	return True
-                   	
-	return False
+                       return True
+
+        return False
 
