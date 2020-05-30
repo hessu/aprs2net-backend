@@ -1,10 +1,10 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 import time
 import threading
 import logging
 import logging.config
-import ConfigParser
+import configparser
 import sys
 import traceback
 
