@@ -39,10 +39,11 @@ class TCPPoll:
         
         try:
             s.connect((host, port))
-            prompt = s.recv(1024)
+            prompt = s.recv(1024).decode('UTF-8')
             self.log.debug('%s: Login prompt: %s', self.id, repr(prompt))
-            s.send("user %s pass -1 vers aprs2net-poll 2.0\r\n" % self.mycall)
-            login_ok = s.recv(1024)
+            login_command = "user %s pass -1 vers aprs2net-poll 2.0\r\n" % self.mycall
+            s.send(login_command.encode('ASCII'))
+            login_ok = s.recv(1024).decode('UTF-8')
             self.log.debug('%s: Login response: %s', self.id, repr(login_ok))
             s.close()
         except IOError as e:
