@@ -42,10 +42,10 @@ class Poller:
         self.log_poller = logging.getLogger('poller')
         
         # read configuration
-        self.config = ConfigParser.ConfigParser()
+        self.config = configparser.ConfigParser()
         self.config.add_section(CONFIG_SECTION)
         
-        for option, value in DEFAULT_CONF.iteritems():
+        for option, value in DEFAULT_CONF.items():
             self.config.set(CONFIG_SECTION, option, value)
             
         self.config.read(config_file)
