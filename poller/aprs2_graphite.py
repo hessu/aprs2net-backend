@@ -1,6 +1,5 @@
 
-import Queue
-import thread
+import queue
 import threading
 
 import graphitesend
@@ -12,9 +11,10 @@ g_thread = None
 
 class GraphiteThread(object):
     def __init__(self, log):
-	self.log = log
+        self.log = log
         self.graphite = None
         self.thr = None
+        
         
         self.queue = Queue.Queue(max_queue_size)
         self.stopping = threading.Event()
@@ -30,7 +30,7 @@ class GraphiteThread(object):
             try:
                 self.log.info("Connecting to Graphite")
                 self.graphite = graphitesend.GraphiteClient(fqdn_squash=True, graphite_server='t2graph.aprs2.net', graphite_port=2003)
-            except Exception, e:
+            except Exception as e:
                 self.log.error("Failed to connect to Graphite: %r" % e)
                 return
     
@@ -69,18 +69,18 @@ class GraphiteThread(object):
 
 class GraphiteSender(object):
     def __init__(self, log, fqdn):
-	self.log = log
-	
-	global g_thread
-	if g_thread == None:
-	    g_thread = GraphiteThread(log)
+        self.log = log
+        
+        global g_thread
+        if g_thread == None:
+            g_thread = GraphiteThread(log)
         
         # remove domain from fqdn
         hostname = fqdn
         #i = hostname.find('.')
         #if i >= 0:
         #    hostname = hostname[0:i]
-
+        
         self.hostname = hostname
 
     def send(self, metric, value):
