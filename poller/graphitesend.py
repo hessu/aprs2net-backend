@@ -358,7 +358,7 @@ class GraphiteClient(object):
                 metric_timestamp = timestamp
 
             if type(value).__name__ in ['str', 'unicode']:
-                print "metric='%(metric)s'  value='%(value)s'" % locals()
+                print("metric='%(metric)s'  value='%(value)s'" % locals())
                 value = float(value)
 
             metric = self.clean_metric_name(metric)
