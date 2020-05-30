@@ -34,26 +34,26 @@ class PollingLog:
         return "\n".join(self.buf) + "\n"
         
     def debug(self, msg, *args, **kwargs):
-    	self.do_append(logging.DEBUG, msg, *args, **kwargs)
+        self.do_append(logging.DEBUG, msg, *args, **kwargs)
         self.log.debug(msg, *args, **kwargs)
     
     def info(self, msg, *args, **kwargs):
-    	self.do_append(logging.INFO, msg, *args, **kwargs)
+        self.do_append(logging.INFO, msg, *args, **kwargs)
         self.log.info(msg, *args, **kwargs)
         
     def warning(self, msg, *args, **kwargs):
-    	self.do_append(logging.WARNING, msg, *args, **kwargs)
+        self.do_append(logging.WARNING, msg, *args, **kwargs)
         self.log.warning(msg, *args, **kwargs)
     
     def error(self, msg, *args, **kwargs):
-    	self.do_append(logging.ERROR, msg, *args, **kwargs)
+        self.do_append(logging.ERROR, msg, *args, **kwargs)
         self.log.error(msg, *args, **kwargs)
     
     def exception(self, msg, *args, **kwargs):
-    	self.do_append(logging.EXCEPTION, msg, *args, **kwargs)
+        self.do_append(logging.EXCEPTION, msg, *args, **kwargs)
         self.log.exception(msg, *args, **kwargs)
     
     def critical(self, msg, *args, **kwargs):
-    	self.do_append(logging.CRITICAL, msg, *args, **kwargs)
+        self.do_append(logging.CRITICAL, msg, *args, **kwargs)
         self.log.critical(msg, *args, **kwargs)
         
