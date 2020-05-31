@@ -81,7 +81,7 @@ class ConfigManager:
             try:
                 self.refresh_config()
             except Exception as e:
-                self.log.error("ConfigManager refresh_config crashed: %r", e)
+                self.log.exception("ConfigManager refresh_config crashed: %r", e)
                 
             time.sleep(POLL_INTERVAL)
     
