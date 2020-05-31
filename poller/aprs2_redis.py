@@ -132,7 +132,7 @@ class APRS2Redis:
         """
         Set the next poll time for a server ID
         """
-        return self.red.zadd(kPollQueue, id, pollt)
+        return self.red.zadd(kPollQueue, {id: pollt})
     
     def getPollQ(self, id):
         """
@@ -251,7 +251,7 @@ class APRS2Redis:
         # expire old keys
         delkeys = ['%s.%d.up' % (id, now_day - i*86400) for i in range(31, 38)]
         delkeys.extend(['%s.%d.down' % (id, now_day - i*86400) for i in range(31, 38)])
-        self.red.hdel(kAvail, delkeys)
+        self.red.hdel(kAvail, *delkeys)
         
         return (avail_3, avail_30)
     
