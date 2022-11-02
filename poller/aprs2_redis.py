@@ -132,7 +132,7 @@ class APRS2Redis:
         """
         Set the next poll time for a server ID
         """
-        return self.red.zadd(kPollQueue, {id: pollt})
+        return self.red.zadd(kPollQueue, id, pollt)
     
     def getPollQ(self, id):
         """

@@ -1,15 +1,15 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 import time
 import logging
 import logging.config
-import ConfigParser
+import configparser
 import sys
 import traceback
 import types
 import socket
 import math
-from urlparse import urlparse
+from urllib.parse import urlparse
 
 import requests
 import json
@@ -61,10 +61,10 @@ class DNSDriver:
         self.log.info("Starting up")
         
         # read configuration
-        self.config = ConfigParser.ConfigParser()
+        self.config = configparser.ConfigParser()
         self.config.add_section(CONFIG_SECTION)
         
-        for option, value in DEFAULT_CONF.iteritems():
+        for option, value in DEFAULT_CONF.items():
             self.config.set(CONFIG_SECTION, option, value)
             
         self.config.read(config_file)
@@ -263,9 +263,9 @@ class DNSDriver:
                     scores.append(props['score'])
                     score_sum += props['score']
                     if 'scorebase' in props:
-                    	sb = props['scorebase']
-                    	for k in sb:
-                    	    avg_scorebase[k] = avg_scorebase[k] + sb[k] if (k in avg_scorebase) else sb[k]
+                        sb = props['scorebase']
+                        for k in sb:
+                            avg_scorebase[k] = avg_scorebase[k] + sb[k] if (k in avg_scorebase) else sb[k]
                         merged_scorebase[site] = props['scorebase']
                 
                 e = stat.get('errors', [])
@@ -348,7 +348,7 @@ class DNSDriver:
                 m['merged_score_keys'] = sorted(merged_score_keys.keys())
             
             if merged_scorebase:
-            	m['merged_scorebase'] = merged_scorebase
+                m['merged_scorebase'] = merged_scorebase
             
             # store state in local database
             #self.log.debug("merged status for %s: %r", id, m)
@@ -465,9 +465,9 @@ class DNSDriver:
         for i in list(set(limited_order_v4) | set(limited_order_v6)):
             h = participating_servers.get(i)
             if h:
-            	h[domain] = 1
+                h[domain] = 1
             else:
-            	participating_servers[i] = { domain: 1 }
+                participating_servers[i] = { domain: 1 }
         
         # Addresses to use, ordered by score
         v4_addrs = [servers.get(i).get('ipv4') for i in limited_order_v4]
@@ -606,9 +606,9 @@ class DNSDriver:
             update.add(fqdn, self.dns_ttl, 'cname', cname + '.')
         else:
             for a in v4_addrs:
-                update.add(fqdn, self.dns_ttl, 'a', a.encode('ascii'))
+                update.add(fqdn, self.dns_ttl, 'a', a)
             for a in v6_addrs:
-                update.add(fqdn, self.dns_ttl, 'aaaa', a.encode('ascii'))
+                update.add(fqdn, self.dns_ttl, 'aaaa', a)
         
         try:
             response = dns.query.tcp(update, self.dns_master, timeout=10)
