@@ -1,6 +1,7 @@
 
 [Unit]
 Description=aprs2.net web nodejs
+After=redis-server.service
 
 [Service]
 Type=simple

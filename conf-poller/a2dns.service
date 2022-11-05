@@ -1,12 +1,12 @@
 
 [Unit]
-Description=aprs2.net poller
+Description=aprs2.net DNS driver
 After=redis-server.service
 
 [Service]
 Type=simple
 WorkingDirectory=/opt/aprs2net-backend/poller
-ExecStart=/opt/aprs2net-backend/poller/aprs2net-poller.py
+ExecStart=/opt/aprs2net-backend/poller/aprs2net-dns.py
 TimeoutStopSec=30
 KillMode=mixed
 User=t2poll
