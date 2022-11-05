@@ -70,8 +70,8 @@
 <li class="list-group-item list-group-item-danger" ng-show="shownServer.status.errors"><div ng-repeat="e in shownServer.status.errors">[{{ e[0] }}] {{ e[1] }}</div></li>
 <li class="list-group-item poll-log" ng-show="showLog && shownLog"><pre>{{ shownLog.log }}</pre></li>
 <li class="list-group-item" ng-show="shownServer.status.props.scorebase">
-	<img ng-src="http://t2graph.aprs2.net/t2/server/{{ shownServer.config.id }}_perf.png">
-	<img ng-src="http://t2graph.aprs2.net/t2/server/{{ shownServer.config.id }}_traffic.png">
+	<img ng-src="//t2graph.aprs2.net/t2/server/{{ shownServer.config.id }}_perf.png">
+	<img ng-src="//t2graph.aprs2.net/t2/server/{{ shownServer.config.id }}_traffic.png">
 	</li>
 </ul>
 </div>
