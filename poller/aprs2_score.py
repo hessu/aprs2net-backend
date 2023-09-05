@@ -54,9 +54,10 @@ class Score:
         # Too old server software version gives penalty.
         # Configure the map key as minimum software version that is "new enough",
         # value is the score penalty given to versions older than this.
+        # A score of None indicates the version is not acceptable.
         # TODO: make configurable from config file.
         self.version_penalty = {
-            'aprsc': { '2.0.18': None, '2.0.19': 300 }
+            'aprsc': { '2.1.0': None, '2.1.10': 600 }
         }
         
         # poll time, in seconds (float), per address family ("ipv4", "ipv6")
