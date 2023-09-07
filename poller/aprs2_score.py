@@ -57,7 +57,7 @@ class Score:
         # A score of None indicates the version is not acceptable.
         # TODO: make configurable from config file.
         self.version_penalty = {
-            'aprsc': { '2.1.0': None, '2.1.10': 600 }
+            'aprsc': { '2.1.0': None, '2.1.10': 1200 }
         }
         
         # poll time, in seconds (float), per address family ("ipv4", "ipv6")
