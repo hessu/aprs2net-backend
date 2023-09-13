@@ -57,7 +57,7 @@ class Score:
         # A score of None indicates the version is not acceptable.
         # TODO: make configurable from config file.
         self.version_penalty = {
-            'aprsc': { '2.1.10': None, '2.1.11': 300 }
+            'aprsc': { '2.1.10': None, '2.1.11': 600 }
         }
         
         # poll time, in seconds (float), per address family ("ipv4", "ipv6")
@@ -169,7 +169,7 @@ class Score:
             for req_ver in reqs:
                if LooseVersion(server_ver) < LooseVersion(req_ver):
                    penalty = reqs.get(req_ver, 1)
-                   if penalty != None:
+                   if penalty is not None:
                        self.score_add('version', penalty, server_ver)
         
         return self.score
