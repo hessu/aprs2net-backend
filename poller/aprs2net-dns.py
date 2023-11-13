@@ -355,17 +355,18 @@ class DNSDriver:
             self.red.setServerStatus(id, m)
             
             # push statistics (through a buffer and thread) to graphite
-            graphite_sender = aprs2_graphite.GraphiteSender(self.log, "server." + server["id"])
-            graphite_sender.send('merged_ok', 1 if m.get('status') == 'ok' else 0)
-            
-            for k in ('score', 'avail_3'):
-                if k in m:
-                    graphite_sender.send('merged_' + k, m.get(k))
-            
-            if props_any:
-                for k in ('clients', 'rate_bytes_in', 'rate_bytes_out', 'rate_connects', 'worst_load'):
-                    if k in props_any:
-                        graphite_sender.send(k, props_any.get(k))
+            if server:
+                graphite_sender = aprs2_graphite.GraphiteSender(self.log, "server." + server["id"])
+                graphite_sender.send('merged_ok', 1 if m.get('status') == 'ok' else 0)
+                
+                for k in ('score', 'avail_3'):
+                    if k in m:
+                        graphite_sender.send('merged_' + k, m.get(k))
+                
+                if props_any:
+                    for k in ('clients', 'rate_bytes_in', 'rate_bytes_out', 'rate_connects', 'worst_load'):
+                        if k in props_any:
+                            graphite_sender.send(k, props_any.get(k))
         
         return merged
     
