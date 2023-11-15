@@ -265,7 +265,6 @@ class ConfigManager:
                     self.red.setPollQ(id, int(time.time()) + random.randint(0,300))
         
         # TODO: add sanity check for too few servers
-        
         self.red.setAddressMap(addr_map)
         self.log.info("Applied new server configuration")
         self.pollq_cleanup(polled)
