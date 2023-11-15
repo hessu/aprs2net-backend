@@ -17,6 +17,7 @@ import json
 import aprs2_redis
 import aprs2_config
 import aprs2_graphite
+from aprs2_cloudflare import aprs2cf
 
 # dnspython.org
 import dns.query
@@ -43,6 +44,9 @@ DEFAULT_CONF = {
     'dns_master': '',
     'dns_zones': '',
     'dns_tsig_key': '',
+
+    'cloudflare_zones': '',
+    'cloudflare_token': '',
     
     # DNS TTL
     'dns_ttl': '600',
@@ -83,7 +87,13 @@ class DNSDriver:
         self.dns_keyring = None
         if key:
             self.dns_keyring = dns.tsigkeyring.from_text({ 'aprs2net-dns.' : key })
-            
+    
+        cloudflare_zones = self.config.get(CONFIG_SECTION, 'cloudflare_zones').split(' ')
+        cloudflare_token = self.config.get(CONFIG_SECTION, 'cloudflare_token')
+        self.dns_cloudflare = None
+        if cloudflare_token and cloudflare_zones:
+            self.dns_cloudflare = aprs2cf(logging.getLogger('cloudflare'), cloudflare_token, cloudflare_zones)
+    
         self.dns_ttl = self.config.getint(CONFIG_SECTION, 'dns_ttl')
         
         self.rhead = {'User-agent': 'aprs2net-dns/2.0'}
@@ -571,7 +581,7 @@ class DNSDriver:
         changed.
         """
         # Only push updates if DNS server is configured
-        if not (self.dns_master and self.dns_zones and self.dns_keyring):
+        if not self.dns_zones:
             return
             
         # check if there are any changes, sort the addresses first so that
@@ -587,7 +597,7 @@ class DNSDriver:
         if self.dns_update_cache.get(fqdn) == cache_key:
             #self.log.info("DNS push [%s]: %s - no changes", logid, fqdn)
             return
-            
+        
         self.dns_update_cache[fqdn] = cache_key
         
         # look up the zone file to update
@@ -596,10 +606,20 @@ class DNSDriver:
             self.log.info("DNS push [%s]: %s is not in a managed zone, not updating", logid, fqdn)
             return
         
+        self.log.info("DNS pushing [%s]: %s: %s", logid, fqdn, cache_key)
+
+        if self.dns_master and self.dns_keyring:
+            self.dns_push_bind(logid, zone, fqdn, v4_addrs, v6_addrs, cname)
+        
+        if self.dns_cloudflare:
+            self.dns_cloudflare.dns_push(logid, zone, fqdn, v4_addrs, v6_addrs, cname)
+
+    def dns_push_bind(self, logid, zone, fqdn, v4_addrs = [], v6_addrs = [], cname = None):
+        """
+        Push a set of changes to a BIND nameserver using the regular DNS protocol.
+        """
         # add a dot to make sure bind doesn't add the zone name in the end
         fqdn = fqdn + '.'
-        
-        self.log.info("DNS pushing [%s]: %s: %s", logid, fqdn, cache_key)
         
         update = dns.update.Update(zone, keyring=self.dns_keyring, keyalgorithm="hmac-sha256")
         update.delete(fqdn)
