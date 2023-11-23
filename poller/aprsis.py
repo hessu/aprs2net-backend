@@ -7,6 +7,7 @@ import socket
 import re
 
 re_prompt_port_full = re.compile('# Port full')
+re_prompt_server_full = re.compile('# Server full')
 re_login_ok = re.compile('# logresp ([^ ]+) ([^, ]+), server ([A-Z0-9\\-]+)')
 
 class TCPPoll:
@@ -74,6 +75,11 @@ class TCPPoll:
             self.log.info('%s: Login prompt says port is full: %s', self.id, repr(prompt))
             return self.error('portfull', "APRS-IS port full, too many clients")
         
+        m = re_prompt_server_full.search(prompt)
+        if m != None:
+            self.log.info('%s: Login prompt says server is full: %s', self.id, repr(prompt))
+            return self.error('serverfull', "APRS-IS server full, too many clients")
+
         m = re_login_ok.search(login_ok)
         if m == None:
             self.log.info('%s: Login response not recognized: %s', self.id, repr(login_ok))
