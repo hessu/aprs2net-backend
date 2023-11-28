@@ -803,7 +803,8 @@ class Poll:
         
         upl = ups[0]
         
-        uplink_server = self.red.getServer(upl.get('id'))
+        uplink_id = upl.get('id')
+        uplink_server = self.red.getServer(uplink_id) if uplink_id else None
         self.log.debug("uplink is: %r", uplink_server)
         if uplink_server == None:
             return self.error('uplinks-odd', 'Connected to unregistered upstream server')
