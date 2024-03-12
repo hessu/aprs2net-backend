@@ -57,3 +57,25 @@ li.poll-log pre {
 	margin: 0px;
 	background: none;
 }
+
+/* server detail */
+
+#popup1-content {
+	position: fixed;
+	top: 0;
+	right: 0;
+	z-index: 100;
+	margin: 0;
+	padding: 15px;
+	max-width: 90%;
+}
+
+#popup1-content > .list-group {
+	max-height: 90vh;
+	overflow-y: auto;
+	box-shadow: 0 3px 5px rgba(0,0,0,0.125);
+}
+
+#popup1-content .pull-right > .glyphicon {
+	margin-left: 15px;
+}
