@@ -18,6 +18,7 @@ import aprs2_redis
 import aprs2_config
 import aprs2_graphite
 from aprs2_cloudflare import aprs2cf
+from failover import Failover
 
 # dnspython.org
 import dns.query
@@ -59,8 +60,17 @@ DEFAULT_CONF = {
     'dns_zones': '',
     'dns_tsig_key': '',
 
+    # Zones on cloudflare backend
     'cloudflare_zones': '',
+    # Access token for the cloudflare API
     'cloudflare_token': '',
+
+    # DNS record used for master/secondary failover fencing
+    'failover_record': '',
+    # instance identifier of this node
+    'failover_instance_id': '',
+    # priority of this node; highest priority wins
+    'failover_priority': '1',
     
     # DNS TTL
     'dns_ttl': '600',
@@ -102,6 +112,14 @@ class DNSDriver:
         self.max_test_result_age = self.config.getint(CONFIG_SECTION, 'max_test_result_age')
         self.min_polled_servers = self.config.getint(CONFIG_SECTION, 'min_polled_servers')
         self.min_polled_ok_pct = self.config.getint(CONFIG_SECTION, 'min_polled_ok_pct')
+
+        self.failover_instance_id = self.config.get(CONFIG_SECTION, 'failover_instance_id')
+        self.failover_record = self.config.get(CONFIG_SECTION, 'failover_record')
+        self.failover_priority = self.config.getint(CONFIG_SECTION, 'failover_priority')
+
+        self.failover = None
+        if self.failover_record != '' and self.failover_priority and self.failover_instance_id != '':
+            self.failover = Failover(logging.getLogger('failover'), self.failover_record, self.failover_instance_id, self.failover_priority)
         
         key = self.config.get(CONFIG_SECTION, 'dns_tsig_key')
         self.dns_keyring = None
@@ -743,6 +761,22 @@ class DNSDriver:
                 return z
         
         return None
+
+    def dns_push_txt(self, fqdn, value):
+        self.log.info("Pushing failover TXT: %s: %s", fqdn, value)
+
+        # look up the zone file to update
+        zone = self.dns_pick_zone(fqdn)
+        if zone == None:
+            self.log.info("DNS push txt: %s is not in a managed zone, not updating", fqdn)
+            return
+
+        if self.dns_master and self.dns_keyring:
+            self.dns_push_bind(logid, zone, fqdn, [], [], None, value)
+        
+        if self.dns_cloudflare:
+            self.dns_cloudflare.dns_push(logid, zone, fqdn, [], [], None, value)
+
     
     def dns_push(self, logid, fqdn, v4_addrs = [], v6_addrs = [], cname = None):
         """
@@ -783,7 +817,7 @@ class DNSDriver:
         if self.dns_cloudflare:
             self.dns_cloudflare.dns_push(logid, zone, fqdn, v4_addrs, v6_addrs, cname)
 
-    def dns_push_bind(self, logid, zone, fqdn, v4_addrs = [], v6_addrs = [], cname = None):
+    def dns_push_bind(self, logid, zone, fqdn, v4_addrs = [], v6_addrs = [], cname = None, txt = None):
         """
         Push a set of changes to a BIND nameserver using the regular DNS protocol.
         """
@@ -840,9 +874,20 @@ class DNSDriver:
         merged_status = self.merge_status(servers, status_set)
         
         # Push current DNS status to the master, if it has changed
-        self.update_dns(servers, merged_status)
+        if self.failover_this_is_active():
+            self.update_dns(servers, merged_status)
         
         self.red.sendDnsStatusMessage({ 'reload': 'full' })
+
+    def failover_this_is_active(self):        
+        if not self.failover:
+            return True
+        
+        if not self.failover.this_is_active():
+            return False
+
+        self.failover.update_record(update_callback=self.dns_push_txt)
+        return True
     
     def loop(self):
         """

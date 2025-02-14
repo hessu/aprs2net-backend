@@ -16,8 +16,8 @@ class aprs2cf:
             'aprs2.net': 'd7c9ec1d772da32eefdb89f962788913',
         }
         
-    def dns_push(self, logid, zone, fqdn, v4_addrs = [], v6_addrs = [], cname = None):
-        use_zone = zone
+    def dns_push(self, logid, zone, fqdn, v4_addrs = [], v6_addrs = [], cname = None, txt = []):
+        use_zone = 'aprs.is' # zone
         zone_id = self.zone_ids[use_zone]
         
         trim_end = '.' + zone
