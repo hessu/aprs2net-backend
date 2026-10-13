@@ -114,7 +114,9 @@ class DNSDriver:
         # config object for the web UI
         self.web_config = {
             'site_descr': self.config.get(CONFIG_SECTION, 'site_descr'),
-            'master': 1
+            'master': 1,
+            'master_rotate': self.master_rotate,
+            'fullfeed_rotate': self.fullfeed_rotate
         }
         
         # redis client

@@ -67,6 +67,10 @@
 		<td>{{r}}</td>
 		<td><span ng-repeat="id in rotateMem[r]" ng-class="{bold: id == shownServer.config.id}"> {{id}}</span></td>
 		</tr>
+	<tr ng-show="cfg.fullfeed_rotate && shownServer.config.member.indexOf(cfg.master_rotate) >= 0">
+		<td>{{cfg.fullfeed_rotate}}</td>
+		<td><span ng-repeat="id in rotateMem[cfg.fullfeed_rotate]" ng-class="{bold: id == shownServer.config.id}"> {{id}}</span></td>
+		</tr>
 	</table>
 	</li>
 <li class="list-group-item list-group-item-danger" ng-show="shownServer.status.errors"><div ng-repeat="e in shownServer.status.errors">[{{ e[0] }}] {{ e[1] }}</div></li>
