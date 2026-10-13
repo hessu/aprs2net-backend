@@ -6,3 +6,4 @@ cd /opt/aprs2net-backend/dehydrated
 
 ../bin/dehydrated -c | logger -t dehydrated
 
+systemctl reload nginx
