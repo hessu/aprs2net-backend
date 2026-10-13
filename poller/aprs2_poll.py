@@ -83,6 +83,8 @@ class Poll:
         self.http_timeout = 5.0
         self.http_got_t = None
         self.client_cap = 3500
+        # Full feed clients are much heavier, so their port gets a lower cap
+        self.fullfeed_client_cap = 1000
         
         self.try_order = ['javap3', 'aprsc', 'javap4']
         
@@ -736,7 +738,7 @@ class Poll:
         """
         Store the client count and load of the full feed port, given a list of
         (clients, clients_max) for its listeners (v4/v6). A clients_max <= 0
-        means unlimited, and then our client_cap applies.
+        means unlimited, and then our fullfeed_client_cap applies.
         """
         
         if not listeners:
@@ -745,7 +747,7 @@ class Poll:
         ff_clients = ff_clients_max = 0
         ff_load = 0.0
         for u, m in listeners:
-            cap = min(self.client_cap, m) if m > 0 else self.client_cap
+            cap = min(self.fullfeed_client_cap, m) if m > 0 else self.fullfeed_client_cap
             ff_clients += u
             ff_clients_max += cap
             ff_load = max(ff_load, float(u) / float(cap) * 100.0)
