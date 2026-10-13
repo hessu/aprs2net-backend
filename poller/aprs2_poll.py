@@ -52,6 +52,11 @@ javap3_re_numeric_sanitize = re.compile('[^\\d]+')
 re_ipv4_port = re.compile('(\\d+\\.\\d+\\.\\d+\\.\\d+):(\\d+)')
 re_ipv6_port = re.compile('([0-9a-f]+:[0-9a-f]+:[0-9a-f]+:[0-9a-f]+:[0-9a-f]+:[0-9a-f]+:[0-9a-f]+:[0-9a-f]+):(\\d+)')
 
+# Full feed port, tested on servers which are members of the rotate below.
+# Load on this port is tracked and scored separately.
+FULLFEED_PORT = 10152
+FULLFEED_TEST_ROTATE = 'rotate.aprs2.net'
+
 def javap3_strfloat(s):
     # replace non-digits with empty strings
     s = javap3_re_numeric_sanitize.sub('', s)
@@ -182,6 +187,9 @@ class Poll:
         if not self.check_uplink():
             return False
         
+        # Optional full feed port, does not affect the server's status
+        self.fullfeed_tests()
+        
         return True
     
     def poll(self):
@@ -192,6 +200,12 @@ class Poll:
             
         self.properties['score'] = self.score.get(self.properties)
         self.properties['scorebase'] = self.score.score_components
+        
+        if success and self.properties.get('fullfeed'):
+            self.properties['fullfeed_score'] = self.score.get_fullfeed(self.properties)
+            self.properties['fullfeed_scorebase'] = self.score.fullfeed_score_components
+            self.log.info("%s: Full feed port %d score %.1f: %r", self.id, FULLFEED_PORT,
+                self.properties['fullfeed_score'], self.score.fullfeed_score_components)
         self.log.info("%s: Server %s, score %.1f: %r", 'OK' if success else 'FAIL', self.id, self.properties['score'], self.score.score_components)
         
         return success
@@ -487,6 +501,16 @@ class Poll:
         self.properties['clients'] = int(t.attrib.get('currentin'))
         self.properties['clients_max'] = int(t.attrib.get('maximum'))
         
+        ff_listeners = []
+        for pl in listeners_tag.findall('portlistener'):
+            ni = pl.find('networkinterface')
+            conn = pl.find('connections')
+            if ni == None or conn == None or ni.attrib.get('port') != str(FULLFEED_PORT):
+                continue
+            ff_listeners.append((int(conn.attrib.get('current', 0)), int(conn.attrib.get('maximum', -1))))
+        
+        self.set_fullfeed_load(ff_listeners)
+        
         #
         # clients traffic
         #
@@ -650,6 +674,9 @@ class Poll:
         # user load percentage
         worst_load = u_load = float(self.properties['clients']) / float(min(self.client_cap, self.properties['clients_max'])) * 100.0
         
+        # full feed port listeners (v4/v6) are tracked separately
+        ff_listeners = []
+        
         #
         # go through port listeners
         #
@@ -675,11 +702,17 @@ class Poll:
             
             self.log.debug("%s: listener %r %d/%d load %.1f %%", self.id, addr, u, m, l_load)
             
+            if addr and addr.rsplit(':', 1)[-1] == str(FULLFEED_PORT):
+                ff_listeners.append((u, m))
+                continue
+            
             if l_load > worst_load:
                 worst_load = l_load
         
         self.properties['user_load'] = u_load
         self.properties['worst_load'] = worst_load
+        
+        self.set_fullfeed_load(ff_listeners)
         
         #
         # uplinks
@@ -699,6 +732,30 @@ class Poll:
         
         return True
         
+    def set_fullfeed_load(self, listeners):
+        """
+        Store the client count and load of the full feed port, given a list of
+        (clients, clients_max) for its listeners (v4/v6). A clients_max <= 0
+        means unlimited, and then our client_cap applies.
+        """
+        
+        if not listeners:
+            return
+        
+        ff_clients = ff_clients_max = 0
+        ff_load = 0.0
+        for u, m in listeners:
+            cap = min(self.client_cap, m) if m > 0 else self.client_cap
+            ff_clients += u
+            ff_clients_max += cap
+            ff_load = max(ff_load, float(u) / float(cap) * 100.0)
+        
+        self.log.debug("%s: full feed port %d %d/%d load %.1f %%", self.id, FULLFEED_PORT, ff_clients, ff_clients_max, ff_load)
+        
+        self.properties['fullfeed_clients'] = ff_clients
+        self.properties['fullfeed_clients_max'] = ff_clients_max
+        self.properties['fullfeed_load'] = ff_load
+    
     def aprsc_get_keys(self, src, keys, blockid):
         """
         Get a set of keys from aprsc json block, with error checking
@@ -850,6 +907,47 @@ class Poll:
         
         return ok and ok_count > 0
 
+    def fullfeed_tests(self):
+        """
+        Test the optional full feed port. Failures here are not errors for the
+        server as a whole, they only prevent it from getting in the full feed rotate.
+        """
+        
+        if FULLFEED_TEST_ROTATE not in self.server.get('member', []):
+            return
+        
+        # We need to know the load of the full feed port separately, so that
+        # we can avoid sending clients to a full port. aprsc and javAPRSSrvr 4
+        # tell us that, javAPRSSrvr 3 does not.
+        # If the server does not report a full feed listener at all, skip it;
+        # otherwise do a login test below to check that the port is reachable.
+        if 'fullfeed_clients' not in self.properties:
+            self.log.info("%s: No full feed port %d listener reported by server", self.id, FULLFEED_PORT)
+            return
+        
+        t = aprsis.TCPPoll(self.log)
+        errors = []
+        
+        for ac, prefix in (('ipv4', 'FF4'), ('ipv6', 'FF6')):
+            if self.server.get(ac) != None:
+                t_start = time.time()
+                [code, msg] = t.poll(self.server[ac], FULLFEED_PORT, self.id, prefix)
+                t_dur = time.time() - t_start
+                
+                if code != 'ok':
+                    errors.append([code, "%s TCP %d: %s" % (ac, FULLFEED_PORT, msg)])
+                else:
+                    self.score.poll_t_fullfeed[ac] = t_dur
+        
+        # All address families need to work, as with 14580
+        if errors:
+            self.score.poll_t_fullfeed = {}
+            self.properties['fullfeed_errors'] = errors
+            self.log.info("%s: Full feed port %d not OK: %r", self.id, FULLFEED_PORT, errors)
+            return
+        
+        self.properties['fullfeed'] = True
+    
     def ping(self):
         lines = Popen(["ping", "-i", "1", "-w", "30", "-n", self.server['ipv4']],
             stdout=PIPE, stderr=STDOUT).communicate()[0].decode('UTF-8').split("\n")

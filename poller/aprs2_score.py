@@ -63,11 +63,15 @@ class Score:
         # poll time, in seconds (float), per address family ("ipv4", "ipv6")
         self.poll_t_14580 = {}
         
+        # full feed port poll time, per address family, like poll_t_14580
+        self.poll_t_fullfeed = {}
+        
         # http status poll time
         self.http_status_t = None
         
         self.score = 0
         self.score_components = {}
+        self.fullfeed_score_components = {}
     
     def score_add(self, type, val, string):
         self.score += val
@@ -78,6 +82,20 @@ class Score:
            if self.score_components[i][0] > 0.0:
                self.score_components[i][0] = int(self.score_components[i][0] * 10) / 10.0
         
+    def aprsis_rtt_score(self, poll_t):
+        """
+        Calculate an arithmetic average score and RTT for a set of APRS-IS
+        port poll times (per address family).
+        """
+        is_score = 0
+        rtt_sum = 0
+        for k in poll_t:
+            t = poll_t.get(k, 30) # default 30 seconds, if not found (should not happen)
+            rtt_sum += t
+            is_score += max(0.0, t - self.rtt_good_enough) * self.aprsis_rtt_mul
+        
+        return (is_score / len(poll_t), rtt_sum / len(poll_t))
+    
     def get(self, props):
         """
         Calculate and return a total score. Best: 0, higher is worce.
@@ -103,15 +121,7 @@ class Score:
             return self.score_max
         
         # Calculate an arithmetic average score based on 14580 RTT.
-        is_score = 0
-        rtt_sum = 0
-        for k in self.poll_t_14580:
-            t = self.poll_t_14580.get(k, 30) # default 30 seconds, if not found (should not happen)
-            rtt_sum += t
-            is_score += max(0.0, t - self.rtt_good_enough) * self.aprsis_rtt_mul
-        
-        is_score = is_score / len(self.poll_t_14580)
-        rtt_avg = rtt_sum / len(self.poll_t_14580)
+        is_score, rtt_avg = self.aprsis_rtt_score(self.poll_t_14580)
         self.score_add('aprsis_rtt', is_score, '%.3f s' % rtt_avg)
         
         #
@@ -173,6 +183,31 @@ class Score:
                        self.score_add('version', penalty, server_ver)
         
         return self.score
+    
+    def get_fullfeed(self, props):
+        """
+        Calculate and return a separate score for the full feed port.
+        Shares the server-wide components (HTTP rtt, uptime, uplink, version)
+        with get(), but replaces the APRS-IS rtt and user load components with
+        the measurements done on the full feed port. Must be called after get().
+        Returns None if the full feed port was not successfully polled.
+        """
+        
+        if len(self.poll_t_fullfeed) < 1:
+            return None
+        
+        c = self.fullfeed_score_components = {}
+        for k in self.score_components:
+            if k not in ('aprsis_rtt', 'user_load'):
+                c[k] = list(self.score_components[k])
+        
+        is_score, rtt_avg = self.aprsis_rtt_score(self.poll_t_fullfeed)
+        c['aprsis_rtt'] = [ int(is_score * 10) / 10.0, '%.3f s' % rtt_avg ]
+        
+        load = props.get('fullfeed_load', 100)
+        c['user_load'] = [ int(load * 10.0 * 10) / 10.0, '%.1f %%' % load ]
+        
+        return sum([v[0] for v in c.values()])
     
     def server_version_disallowed(self, props):
         """

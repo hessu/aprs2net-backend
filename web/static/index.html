@@ -35,6 +35,8 @@
 	<span ng:class="shownServer.status.status == 'ok' ? 'glyphicon glyphicon-ok' : 'glyphicon glyphicon-fire'"></span>
 	<span>  {{ shownServer.config.fqdn }}  </span>
 	<span ng-show="shownServer.status.props.score"> <span><span class='glyphicon glyphicon-stats'></span> score {{ shownServer.status.props.score | number : 1 }}</span></span>
+	<span ng-show="shownServer.status.props.fullfeed_score != null"> <span><span class='glyphicon glyphicon-stats'></span> full feed score {{ shownServer.status.props.fullfeed_score | number : 1 }}</span></span>
+	<span ng-show="shownServer.status.props.fullfeed_load != null">  full feed load {{ shownServer.status.props.fullfeed_load | number : 1 }} % ({{ shownServer.status.props.fullfeed_clients }}/{{ shownServer.status.props.fullfeed_clients_max }})</span>
 	<span ng-show="shownServer.status.avail_30">  availability {{ shownServer.status.avail_30 | number : 3 }} %/30 days, {{ shownServer.status.avail_3 | number : 3 }} %/3 days</span></span>
 	<span ng-show="shownServer.config.out_of_service">  <a href="#" class="btn btn-warning btn-xs active warning" role="button" style="cursor: default;">Out of service</a></span>
 	<span class='pull-right'>

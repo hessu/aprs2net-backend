@@ -41,6 +41,10 @@ DEFAULT_CONF = {
     # rotates which are not managed
     'unmanaged_rotates': 'hubs.aprs2.net hub-rotate.aprs2.net cwop.aprs.net rotate.aprs.net',
     
+    # Rotate of master rotate members which have a working full feed port.
+    # Empty to disable.
+    'fullfeed_rotate': 'full-feed.aprs2.net',
+    
     'dns_master': '',
     'dns_zones': '',
     'dns_tsig_key': '',
@@ -78,6 +82,7 @@ class DNSDriver:
         self.dns_zones = self.config.get(CONFIG_SECTION, 'dns_zones').split(' ')
         self.master_rotate = self.config.get(CONFIG_SECTION, 'master_rotate')
         self.unmanaged_rotates = self.config.get(CONFIG_SECTION, 'unmanaged_rotates').split(' ')
+        self.fullfeed_rotate = self.config.get(CONFIG_SECTION, 'fullfeed_rotate')
         self.pollers = self.config.get(CONFIG_SECTION, 'pollers').split(' ')
         self.max_test_result_age = self.config.getint(CONFIG_SECTION, 'max_test_result_age')
         self.min_polled_servers = self.config.getint(CONFIG_SECTION, 'min_polled_servers')
@@ -235,6 +240,7 @@ class DNSDriver:
         for id in status_set:
             ok_count = 0
             scores = []
+            fullfeed_scores = []
             errors = {}
             score_sum = 0.0
             latest_ok = None
@@ -277,6 +283,9 @@ class DNSDriver:
                         for k in sb:
                             avg_scorebase[k] = avg_scorebase[k] + sb[k] if (k in avg_scorebase) else sb[k]
                         merged_scorebase[site] = props['scorebase']
+                
+                if props and props.get('fullfeed') and props.get('fullfeed_score') != None:
+                    fullfeed_scores.append(props['fullfeed_score'])
                 
                 e = stat.get('errors', [])
                 for k, v in e:
@@ -360,6 +369,18 @@ class DNSDriver:
             if merged_scorebase:
                 m['merged_scorebase'] = merged_scorebase
             
+            # Full feed port: needs to work from a majority of pollers, too.
+            # Scored separately, but with the same availability penalty.
+            if status == 'ok' and float(len(fullfeed_scores)) / len(status_set[id]) > 0.48:
+                m['fullfeed_status'] = 'ok'
+                m['fullfeed_score'] = sum(fullfeed_scores) / len(fullfeed_scores) + availability_score
+                if m.get('props'):
+                    m['props']['fullfeed_score'] = m['fullfeed_score']
+            else:
+                m['fullfeed_status'] = 'fail'
+                if m.get('props'):
+                    m['props'].pop('fullfeed_score', None)
+            
             # store state in local database
             #self.log.debug("merged status for %s: %r", id, m)
             self.red.setServerStatus(id, m)
@@ -369,12 +390,13 @@ class DNSDriver:
                 graphite_sender = aprs2_graphite.GraphiteSender(self.log, "server." + server["id"])
                 graphite_sender.send('merged_ok', 1 if m.get('status') == 'ok' else 0)
                 
-                for k in ('score', 'avail_3'):
+                for k in ('score', 'avail_3', 'fullfeed_score'):
                     if k in m:
                         graphite_sender.send('merged_' + k, m.get(k))
                 
                 if props_any:
-                    for k in ('clients', 'rate_bytes_in', 'rate_bytes_out', 'rate_connects', 'worst_load'):
+                    for k in ('clients', 'rate_bytes_in', 'rate_bytes_out', 'rate_connects', 'worst_load',
+                              'fullfeed_clients', 'fullfeed_load'):
                         if k in props_any:
                             graphite_sender.send(k, props_any.get(k))
         
@@ -392,9 +414,12 @@ class DNSDriver:
         participating_servers = {}
         
         for d in rotates:
-            if d in self.unmanaged_rotates:
+            if d in self.unmanaged_rotates or d == self.fullfeed_rotate:
                 continue
             self.update_dns_rotate(d, rotates[d], merged_status, servers, participating_servers)
+        
+        if self.fullfeed_rotate:
+            self.update_dns_fullfeed(rotates, merged_status, servers, participating_servers)
         
         # Push the addresses of individual servers
         self.update_dns_hosts(servers, merged_status)
@@ -404,15 +429,13 @@ class DNSDriver:
         
         self.update_total_stats(servers, merged_status)
     
-    def update_dns_rotate(self, domain, domain_conf, status, servers, participating_servers):
+    def rotate_eligible(self, domain, members, status, servers):
         """
-        Update a single DNS rotate
+        Figure out which members of a rotate are eligible for being in it.
+        Returns (members_not_deleted, members_ok, members_ok_v4, members_ok_v6).
         """
-        self.log.info("Processing rotate %s ...", domain)
-        #self.log.debug("Checking rotate %s: %r", domain, domain_conf)
         
         # which members are OK, and which of them have IPv4 or IPv6 addresses available
-        members = domain_conf.get('members')
         members_not_deleted = [i for i in members
             if servers.get(i) and servers.get(i).get('deleted') != True]
         members_ok = [i for i in members_not_deleted
@@ -436,9 +459,74 @@ class DNSDriver:
         self.log.debug("Members ok ip4: %r", members_ok_v4)
         self.log.debug("Members ok ip6: %r", members_ok_v6)
         
+        return (members_not_deleted, members_ok, members_ok_v4, members_ok_v6)
+    
+    def update_dns_rotate(self, domain, domain_conf, status, servers, participating_servers):
+        """
+        Update a single DNS rotate
+        """
+        self.log.info("Processing rotate %s ...", domain)
+        #self.log.debug("Checking rotate %s: %r", domain, domain_conf)
+        
+        members_not_deleted, members_ok, members_ok_v4, members_ok_v6 = \
+            self.rotate_eligible(domain, domain_conf.get('members'), status, servers)
+        
+        if domain == self.master_rotate:
+            fallback_cname = None
+        else:
+            fallback_cname = self.master_rotate
+        
+        if self.push_rotate(domain, members_ok_v4, members_ok_v6, 'score', fallback_cname,
+                status, servers, participating_servers):
+            self.store_rotate_stats(domain, members_ok, members_not_deleted, status)
+    
+    def update_dns_fullfeed(self, rotates, status, servers, participating_servers):
+        """
+        Update the full feed rotate: servers which are eligible for the
+        master rotate, and have a working full feed port which is not too full.
+        Ordered by the separate full feed port score.
+        """
+        domain = self.fullfeed_rotate
+        self.log.info("Processing full feed rotate %s ...", domain)
+        
+        master_conf = rotates.get(self.master_rotate)
+        if not master_conf:
+            self.log.error("Master rotate %s not configured, cannot set up full feed rotate %s", self.master_rotate, domain)
+            return
+        
+        members_not_deleted, members_ok, members_ok_v4, members_ok_v6 = \
+            self.rotate_eligible(self.master_rotate, master_conf.get('members'), status, servers)
+        
+        def fullfeed_ok(i):
+            st = status.get(i)
+            props = st.get('props', {})
+            return st.get('fullfeed_status') == 'ok' and st.get('fullfeed_score') != None \
+                and props.get('fullfeed_load', 100) <= 80
+        
+        ff_ok_v4 = [i for i in members_ok_v4 if fullfeed_ok(i)]
+        ff_ok_v6 = [i for i in members_ok_v6 if fullfeed_ok(i)]
+        
+        self.log.debug("Full feed ok ip4: %r", ff_ok_v4)
+        self.log.debug("Full feed ok ip6: %r", ff_ok_v6)
+        
+        # There is no good fallback, other servers may not have a full feed port.
+        if self.push_rotate(domain, ff_ok_v4, ff_ok_v6, 'fullfeed_score', None,
+                status, servers, participating_servers):
+            self.store_rotate_stats(domain, list(set(ff_ok_v4) | set(ff_ok_v6)),
+                list(set(members_ok_v4) | set(members_ok_v6)), status, clients_key='fullfeed_clients')
+    
+    def push_rotate(self, domain, members_ok_v4, members_ok_v6, score_key, fallback_cname,
+            status, servers, participating_servers):
+        """
+        Pick the best-scoring eligible members of a rotate and push them to DNS.
+        If there are no working servers, CNAME the rotate to fallback_cname,
+        or leave DNS untouched if fallback_cname is None.
+        Returns True if addresses were pushed.
+        """
+        
         # sort by score
-        scored_order_v4 = sorted(members_ok_v4, key=lambda x:status.get(x).get('score'))
-        scored_order_v6 = sorted(members_ok_v6, key=lambda x:status.get(x).get('score'))
+        scored_order_v4 = sorted(members_ok_v4, key=lambda x:status.get(x).get(score_key))
+        scored_order_v6 = sorted(members_ok_v6, key=lambda x:status.get(x).get(score_key))
         
         # Adjust the sizes of rotates: Number of entries * 0.55, so that
         # load balancing happens even in smaller rotates (the few servers with
@@ -459,19 +547,19 @@ class DNSDriver:
         limited_order_v4 = scored_order_v4[0:v4_limit]
         limited_order_v6 = scored_order_v6[0:v6_limit]
         
-        self.log.info("Scored order ip4: %r", [(i, '%.1f' % status.get(i).get('score')) for i in limited_order_v4])
-        self.log.info("Left out     ip4: %r", [(i, '%.1f' % status.get(i).get('score')) for i in scored_order_v4[v4_limit:]])
-        self.log.info("Scored order ip6: %r", [(i, '%.1f' % status.get(i).get('score')) for i in limited_order_v6])
-        self.log.info("Left out     ip6: %r", [(i, '%.1f' % status.get(i).get('score')) for i in scored_order_v6[v6_limit:]])
+        self.log.info("Scored order ip4: %r", [(i, '%.1f' % status.get(i).get(score_key)) for i in limited_order_v4])
+        self.log.info("Left out     ip4: %r", [(i, '%.1f' % status.get(i).get(score_key)) for i in scored_order_v4[v4_limit:]])
+        self.log.info("Scored order ip6: %r", [(i, '%.1f' % status.get(i).get(score_key)) for i in limited_order_v6])
+        self.log.info("Left out     ip6: %r", [(i, '%.1f' % status.get(i).get(score_key)) for i in scored_order_v6[v6_limit:]])
         
         if len(limited_order_v4) < 1:
-            if domain == self.master_rotate:
-                self.log.error("Ouch! Master rotate %s has no working servers - not doing anything!", self.master_rotate)
-                return
+            if fallback_cname == None:
+                self.log.error("Ouch! Rotate %s has no working servers - not doing anything!", domain)
+                return False
             
-            self.log.info("VERDICT %s: No working servers, CNAME %s", domain, self.master_rotate)
-            self.dns_push(domain, domain, cname=self.master_rotate)
-            return
+            self.log.info("VERDICT %s: No working servers, CNAME %s", domain, fallback_cname)
+            self.dns_push(domain, domain, cname=fallback_cname)
+            return False
         
         for i in list(set(limited_order_v4) | set(limited_order_v6)):
             h = participating_servers.get(i)
@@ -486,7 +574,7 @@ class DNSDriver:
         
         self.dns_push(domain, domain, v4_addrs=v4_addrs, v6_addrs=v6_addrs)
         
-        self.store_rotate_stats(domain, members_ok, members_not_deleted, status)
+        return True
 
     def update_total_stats(self, servers, status):
         """
@@ -503,14 +591,14 @@ class DNSDriver:
         
         self.store_rotate_stats('total', members_ok, members_not_deleted, status)
         
-    def store_rotate_stats(self, domain, members_ok, members_not_deleted, status):
+    def store_rotate_stats(self, domain, members_ok, members_not_deleted, status, clients_key='clients'):
         """
         Calculate and store some statistics for a rotate
         """
         total_clients = rate_bytes_in = rate_bytes_out = 0
         for i in members_ok:
             p = status.get(i).get('props', {})
-            total_clients += p.get('clients', 0)
+            total_clients += p.get(clients_key, 0)
             rate_bytes_in += p.get('rate_bytes_in', 0)
             rate_bytes_out += p.get('rate_bytes_out', 0)
             
