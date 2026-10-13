@@ -44,6 +44,9 @@ DEFAULT_CONF = {
     # Rotate of master rotate members which have a working full feed port.
     # Empty to disable.
     'fullfeed_rotate': 'full-feed.aprs2.net',
+    # Minimum full feed port client capacity. Small ports might fill up
+    # before load balancing gets to react.
+    'fullfeed_min_clients': '200',
     
     'dns_master': '',
     'dns_zones': '',
@@ -83,6 +86,7 @@ class DNSDriver:
         self.master_rotate = self.config.get(CONFIG_SECTION, 'master_rotate')
         self.unmanaged_rotates = self.config.get(CONFIG_SECTION, 'unmanaged_rotates').split(' ')
         self.fullfeed_rotate = self.config.get(CONFIG_SECTION, 'fullfeed_rotate')
+        self.fullfeed_min_clients = self.config.getint(CONFIG_SECTION, 'fullfeed_min_clients')
         self.pollers = self.config.get(CONFIG_SECTION, 'pollers').split(' ')
         self.max_test_result_age = self.config.getint(CONFIG_SECTION, 'max_test_result_age')
         self.min_polled_servers = self.config.getint(CONFIG_SECTION, 'min_polled_servers')
@@ -500,8 +504,13 @@ class DNSDriver:
         def fullfeed_ok(i):
             st = status.get(i)
             props = st.get('props', {})
-            return st.get('fullfeed_status') == 'ok' and st.get('fullfeed_score') != None \
-                and props.get('fullfeed_load', 100) <= 80
+            if st.get('fullfeed_status') != 'ok' or st.get('fullfeed_score') == None:
+                return False
+            if props.get('fullfeed_clients_max', 0) < self.fullfeed_min_clients:
+                self.log.info("%s: full feed port accepts %d clients, minimum %d - skipping",
+                    i, props.get('fullfeed_clients_max', 0), self.fullfeed_min_clients)
+                return False
+            return props.get('fullfeed_load', 100) <= 80
         
         ff_ok_v4 = [i for i in members_ok_v4 if fullfeed_ok(i)]
         ff_ok_v6 = [i for i in members_ok_v6 if fullfeed_ok(i)]
