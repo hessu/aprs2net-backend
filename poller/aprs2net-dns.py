@@ -18,6 +18,7 @@ import aprs2_redis
 import aprs2_config
 import aprs2_graphite
 from aprs2_cloudflare import aprs2cf
+from failover import Failover, ROLE_BACKUP
 
 # dnspython.org
 import dns.query
@@ -48,12 +49,42 @@ DEFAULT_CONF = {
     # before load balancing gets to react.
     'fullfeed_min_clients': '200',
     
+    # Rotate of master rotate members which serve IS2 clients: IS2 uplink,
+    # IS2 upgrade on 14580 and an IS2-only port 14581. Empty to disable.
+    'is2_rotate': 'is2.aprs2.net',
+    # Rotate of full feed rotate members which also serve IS2 full feed
+    # clients: IS2 upgrade on 10152 and an IS2-only port 10153. Empty to disable.
+    'fullfeed_is2_rotate': 'full-feed-is2.aprs2.net',
+    
     'dns_master': '',
     'dns_zones': '',
     'dns_tsig_key': '',
 
+    # Zones on cloudflare backend
     'cloudflare_zones': '',
+    # Access token for the cloudflare API
     'cloudflare_token': '',
+    # For testing: write all records, on both the BIND and cloudflare
+    # backends, into this zone instead of the zone they belong to, so that
+    # rotate.aprs2.net becomes rotate.<override zone>. The failover
+    # heartbeat is looked up from the override zone, too. Empty for
+    # normal operation.
+    'dns_zone_override': '',
+
+    # Primary/backup failover between two DNS driver instances. Empty
+    # failover_record disables it and this instance always updates DNS.
+    # TXT record the primary rewrites as a heartbeat after each update round
+    'failover_record': '',
+    # instance identifier of this node, written into the heartbeat
+    'failover_instance_id': '',
+    # 'primary' always updates DNS and writes the heartbeat; 'backup' only
+    # updates DNS while the heartbeat has not changed for failover_timeout
+    'failover_role': 'primary',
+    # seconds the heartbeat must stay unchanged before the backup takes over
+    'failover_timeout': '900',
+    # TTL of the heartbeat TXT record: short, so that the backup sees the
+    # heartbeat stop without waiting for resolver caches
+    'failover_record_ttl': '60',
     
     # DNS TTL
     'dns_ttl': '600',
@@ -83,14 +114,49 @@ class DNSDriver:
         self.dns_master = self.config.get(CONFIG_SECTION, 'dns_master')
         self.poll_interval = self.config.getint(CONFIG_SECTION, 'poll_interval')
         self.dns_zones = self.config.get(CONFIG_SECTION, 'dns_zones').split(' ')
+        self.dns_zone_override = self.config.get(CONFIG_SECTION, 'dns_zone_override') or None
+        if self.dns_zone_override:
+            self.log.warning("DNS zone override in effect: all records will be written in zone %s", self.dns_zone_override)
         self.master_rotate = self.config.get(CONFIG_SECTION, 'master_rotate')
         self.unmanaged_rotates = self.config.get(CONFIG_SECTION, 'unmanaged_rotates').split(' ')
         self.fullfeed_rotate = self.config.get(CONFIG_SECTION, 'fullfeed_rotate')
         self.fullfeed_min_clients = self.config.getint(CONFIG_SECTION, 'fullfeed_min_clients')
+        self.is2_rotate = self.config.get(CONFIG_SECTION, 'is2_rotate')
+        self.fullfeed_is2_rotate = self.config.get(CONFIG_SECTION, 'fullfeed_is2_rotate')
+        # rotates derived from the master rotate's members by the poll results
+        self.derived_rotates = [r for r in (self.fullfeed_rotate, self.is2_rotate, self.fullfeed_is2_rotate) if r]
         self.pollers = self.config.get(CONFIG_SECTION, 'pollers').split(' ')
         self.max_test_result_age = self.config.getint(CONFIG_SECTION, 'max_test_result_age')
         self.min_polled_servers = self.config.getint(CONFIG_SECTION, 'min_polled_servers')
         self.min_polled_ok_pct = self.config.getint(CONFIG_SECTION, 'min_polled_ok_pct')
+
+        self.failover_instance_id = self.config.get(CONFIG_SECTION, 'failover_instance_id')
+        self.failover_record = self.config.get(CONFIG_SECTION, 'failover_record')
+        self.failover_role = self.config.get(CONFIG_SECTION, 'failover_role')
+        self.failover_timeout = self.config.getint(CONFIG_SECTION, 'failover_timeout')
+        self.failover_record_ttl = self.config.getint(CONFIG_SECTION, 'failover_record_ttl')
+
+        self.failover = None
+        if self.failover_record != '' and self.failover_instance_id != '':
+            # The heartbeat is looked up from where it is actually written,
+            # which the zone override may move. The write goes through
+            # dns_push_txt, which applies the override itself.
+            heartbeat_lookup = self.dns_apply_zone_override(self.dns_pick_zone(self.failover_record), self.failover_record)[1]
+            self.failover = Failover(logging.getLogger('failover'), heartbeat_lookup,
+                self.failover_instance_id, self.failover_role, self.failover_timeout)
+        
+        # The backup instance never sends metrics to graphite, not even
+        # while it is covering for the primary, so that the metrics are
+        # not sent twice.
+        self.send_metrics = not (self.failover and self.failover.role == ROLE_BACKUP)
+        if not self.send_metrics:
+            self.log.info("Failover: backup instance, not sending metrics to graphite")
+        
+        # Failover state on the previous round, and when the previous round
+        # ran, for noticing that the other instance may have changed DNS
+        # in the meantime
+        self.failover_was_active = None
+        self.failover_last_round = None
         
         key = self.config.get(CONFIG_SECTION, 'dns_tsig_key')
         self.dns_keyring = None
@@ -110,13 +176,18 @@ class DNSDriver:
         
         # cache DNS state for each name, to prevent updates which do not change anything
         self.dns_update_cache = {}
+        # DNS pushes attempted and failed during the current update round
+        self.dns_push_attempts = 0
+        self.dns_push_failures = 0
         
         # config object for the web UI
         self.web_config = {
             'site_descr': self.config.get(CONFIG_SECTION, 'site_descr'),
             'master': 1,
             'master_rotate': self.master_rotate,
-            'fullfeed_rotate': self.fullfeed_rotate
+            'fullfeed_rotate': self.fullfeed_rotate,
+            'is2_rotate': self.is2_rotate,
+            'fullfeed_is2_rotate': self.fullfeed_is2_rotate
         }
         
         # redis client
@@ -247,6 +318,8 @@ class DNSDriver:
             ok_count = 0
             scores = []
             fullfeed_scores = []
+            is2_count = 0
+            fullfeed_is2_count = 0
             errors = {}
             score_sum = 0.0
             latest_ok = None
@@ -292,6 +365,11 @@ class DNSDriver:
                 
                 if props and props.get('fullfeed') and props.get('fullfeed_score') != None:
                     fullfeed_scores.append(props['fullfeed_score'])
+                
+                if props and props.get('is2'):
+                    is2_count += 1
+                if props and props.get('fullfeed_is2'):
+                    fullfeed_is2_count += 1
                 
                 e = stat.get('errors', [])
                 for k, v in e:
@@ -387,12 +465,29 @@ class DNSDriver:
                 if m.get('props'):
                     m['props'].pop('fullfeed_score', None)
             
+            # IS2: the IS2 port needs to work from a majority of pollers, too.
+            # The IS2 rotate uses the server's main score, the IS2 full feed
+            # rotate the full feed score. The merged verdicts replace the
+            # latest poller's own in the props shown on the web UI.
+            if status == 'ok' and float(is2_count) / len(status_set[id]) > 0.48:
+                m['is2_status'] = 'ok'
+            else:
+                m['is2_status'] = 'fail'
+            if m['is2_status'] == 'ok' and m['fullfeed_status'] == 'ok' \
+                    and float(fullfeed_is2_count) / len(status_set[id]) > 0.48:
+                m['fullfeed_is2_status'] = 'ok'
+            else:
+                m['fullfeed_is2_status'] = 'fail'
+            if m.get('props'):
+                m['props']['is2'] = m['is2_status'] == 'ok'
+                m['props']['fullfeed_is2'] = m['fullfeed_is2_status'] == 'ok'
+            
             # store state in local database
             #self.log.debug("merged status for %s: %r", id, m)
             self.red.setServerStatus(id, m)
             
             # push statistics (through a buffer and thread) to graphite
-            if server:
+            if server and self.send_metrics:
                 graphite_sender = aprs2_graphite.GraphiteSender(self.log, "server." + server["id"])
                 graphite_sender.send('merged_ok', 1 if m.get('status') == 'ok' else 0)
                 
@@ -420,12 +515,24 @@ class DNSDriver:
         participating_servers = {}
         
         for d in rotates:
-            if d in self.unmanaged_rotates or d == self.fullfeed_rotate:
+            if d in self.unmanaged_rotates or d in self.derived_rotates:
                 continue
             self.update_dns_rotate(d, rotates[d], merged_status, servers, participating_servers)
         
         if self.fullfeed_rotate:
-            self.update_dns_fullfeed(rotates, merged_status, servers, participating_servers)
+            self.update_dns_derived(self.fullfeed_rotate, 'full feed', self.fullfeed_ok,
+                'fullfeed_score', 'fullfeed_clients',
+                rotates, merged_status, servers, participating_servers)
+        
+        if self.is2_rotate:
+            self.update_dns_derived(self.is2_rotate, 'IS2', self.is2_ok,
+                'score', 'clients',
+                rotates, merged_status, servers, participating_servers)
+        
+        if self.fullfeed_is2_rotate:
+            self.update_dns_derived(self.fullfeed_is2_rotate, 'IS2 full feed', self.fullfeed_is2_ok,
+                'fullfeed_score', 'fullfeed_clients',
+                rotates, merged_status, servers, participating_servers)
         
         # Push the addresses of individual servers
         self.update_dns_hosts(servers, merged_status)
@@ -486,45 +593,66 @@ class DNSDriver:
                 status, servers, participating_servers):
             self.store_rotate_stats(domain, members_ok, members_not_deleted, status)
     
-    def update_dns_fullfeed(self, rotates, status, servers, participating_servers):
+    def fullfeed_ok(self, i, status):
         """
-        Update the full feed rotate: servers which are eligible for the
-        master rotate, and have a working full feed port which is not too full.
-        Ordered by the separate full feed port score.
+        Is the server eligible for the full feed rotate: a working full feed
+        port, large enough, and not too full.
         """
-        domain = self.fullfeed_rotate
-        self.log.info("Processing full feed rotate %s ...", domain)
+        st = status.get(i)
+        props = st.get('props', {})
+        if st.get('fullfeed_status') != 'ok' or st.get('fullfeed_score') == None:
+            return False
+        if props.get('fullfeed_clients_max', 0) < self.fullfeed_min_clients:
+            self.log.info("%s: full feed port accepts %d clients, minimum %d - skipping",
+                i, props.get('fullfeed_clients_max', 0), self.fullfeed_min_clients)
+            return False
+        return props.get('fullfeed_load', 100) <= 80
+    
+    def is2_ok(self, i, status):
+        """
+        Is the server eligible for the IS2 rotate: the pollers found it
+        serving IS2 clients. The IS2 clients use the ordinary client ports,
+        so the server's main load limits apply as for the master rotate.
+        """
+        return status.get(i).get('is2_status') == 'ok'
+    
+    def fullfeed_is2_ok(self, i, status):
+        """
+        Is the server eligible for the IS2 full feed rotate: eligible for
+        the full feed rotate, and the pollers found it serving IS2 full feed
+        clients.
+        """
+        return status.get(i).get('fullfeed_is2_status') == 'ok' and self.fullfeed_ok(i, status)
+    
+    def update_dns_derived(self, domain, descr, eligible, score_key, clients_key,
+            rotates, status, servers, participating_servers):
+        """
+        Update a rotate derived from the master rotate: the servers which are
+        eligible for the master rotate, and for which eligible(id, status)
+        is True. Ordered by the score in score_key. The rotate's client
+        count statistic is summed from clients_key.
+        """
+        self.log.info("Processing %s rotate %s ...", descr, domain)
         
         master_conf = rotates.get(self.master_rotate)
         if not master_conf:
-            self.log.error("Master rotate %s not configured, cannot set up full feed rotate %s", self.master_rotate, domain)
+            self.log.error("Master rotate %s not configured, cannot set up %s rotate %s", self.master_rotate, descr, domain)
             return
         
         members_not_deleted, members_ok, members_ok_v4, members_ok_v6 = \
             self.rotate_eligible(self.master_rotate, master_conf.get('members'), status, servers)
         
-        def fullfeed_ok(i):
-            st = status.get(i)
-            props = st.get('props', {})
-            if st.get('fullfeed_status') != 'ok' or st.get('fullfeed_score') == None:
-                return False
-            if props.get('fullfeed_clients_max', 0) < self.fullfeed_min_clients:
-                self.log.info("%s: full feed port accepts %d clients, minimum %d - skipping",
-                    i, props.get('fullfeed_clients_max', 0), self.fullfeed_min_clients)
-                return False
-            return props.get('fullfeed_load', 100) <= 80
+        ok_v4 = [i for i in members_ok_v4 if eligible(i, status)]
+        ok_v6 = [i for i in members_ok_v6 if eligible(i, status)]
         
-        ff_ok_v4 = [i for i in members_ok_v4 if fullfeed_ok(i)]
-        ff_ok_v6 = [i for i in members_ok_v6 if fullfeed_ok(i)]
+        self.log.debug("%s ok ip4: %r", descr, ok_v4)
+        self.log.debug("%s ok ip6: %r", descr, ok_v6)
         
-        self.log.debug("Full feed ok ip4: %r", ff_ok_v4)
-        self.log.debug("Full feed ok ip6: %r", ff_ok_v6)
-        
-        # There is no good fallback, other servers may not have a full feed port.
-        if self.push_rotate(domain, ff_ok_v4, ff_ok_v6, 'fullfeed_score', None,
+        # There is no good fallback, other servers may not have the service.
+        if self.push_rotate(domain, ok_v4, ok_v6, score_key, None,
                 status, servers, participating_servers):
-            self.store_rotate_stats(domain, list(set(ff_ok_v4) | set(ff_ok_v6)),
-                list(set(members_ok_v4) | set(members_ok_v6)), status, clients_key='fullfeed_clients')
+            self.store_rotate_stats(domain, list(set(ok_v4) | set(ok_v6)),
+                list(set(members_ok_v4) | set(members_ok_v6)), status, clients_key=clients_key)
     
     def push_rotate(self, domain, members_ok_v4, members_ok_v6, score_key, fallback_cname,
             status, servers, participating_servers):
@@ -674,14 +802,53 @@ class DNSDriver:
         
         return None
     
+    def dns_apply_zone_override(self, zone, fqdn):
+        """
+        Apply the testing zone override, if configured: return the zone to
+        update and the FQDN within it. Without an override, or if the FQDN
+        is not in a managed zone, both are returned as they are.
+        """
+        if not self.dns_zone_override or zone == None:
+            return zone, fqdn
+        
+        name = fqdn[:-(len(zone) + 1)]
+        return self.dns_zone_override, name + '.' + self.dns_zone_override
+
+    def dns_push_txt(self, fqdn, value):
+        """
+        Push a single TXT record, replacing whatever the name had before.
+        Used for the failover heartbeat, so this is not deduplicated through
+        the update cache: the value changes on every round.
+        """
+        logid = 'heartbeat'
+        
+        # look up the zone file to update
+        zone = self.dns_pick_zone(fqdn)
+        if zone == None:
+            self.log.info("DNS push [%s]: %s is not in a managed zone, not updating", logid, fqdn)
+            return True
+        
+        zone, fqdn = self.dns_apply_zone_override(zone, fqdn)
+        self.log.info("DNS pushing [%s]: %s: TXT %s", logid, fqdn, value)
+        
+        ok = True
+        if self.dns_master and self.dns_keyring:
+            ok = self.dns_push_bind(logid, zone, fqdn, txt=value, ttl=self.failover_record_ttl) and ok
+        
+        if self.dns_cloudflare:
+            ok = self.dns_cloudflare.dns_push(logid, zone, fqdn, txt=value, ttl=self.failover_record_ttl) and ok
+        
+        return ok
+    
     def dns_push(self, logid, fqdn, v4_addrs = [], v6_addrs = [], cname = None):
         """
         Push a set of A and AAAA records to the DNS, but only if they've
-        changed.
+        changed. Returns False if the push was attempted and failed on any
+        backend; a failed push is retried on the next round.
         """
         # Only push updates if DNS server is configured
         if not self.dns_zones:
-            return
+            return True
             
         # check if there are any changes, sort the addresses first so that
         # scoring order changes do not cause cache misses
@@ -695,57 +862,83 @@ class DNSDriver:
         
         if self.dns_update_cache.get(fqdn) == cache_key:
             #self.log.info("DNS push [%s]: %s - no changes", logid, fqdn)
-            return
-        
-        self.dns_update_cache[fqdn] = cache_key
+            return True
         
         # look up the zone file to update
         zone = self.dns_pick_zone(fqdn)
         if zone == None:
             self.log.info("DNS push [%s]: %s is not in a managed zone, not updating", logid, fqdn)
-            return
+            return True
         
+        cache_fqdn = fqdn
+        zone, fqdn = self.dns_apply_zone_override(zone, fqdn)
         self.log.info("DNS pushing [%s]: %s: %s", logid, fqdn, cache_key)
-
+        
+        self.dns_push_attempts += 1
+        ok = True
         if self.dns_master and self.dns_keyring:
-            self.dns_push_bind(logid, zone, fqdn, v4_addrs, v6_addrs, cname)
+            ok = self.dns_push_bind(logid, zone, fqdn, v4_addrs, v6_addrs, cname) and ok
         
         if self.dns_cloudflare:
-            self.dns_cloudflare.dns_push(logid, zone, fqdn, v4_addrs, v6_addrs, cname)
+            ok = self.dns_cloudflare.dns_push(logid, zone, fqdn, v4_addrs, v6_addrs, cname) and ok
+        
+        if ok:
+            # remember what is in the DNS now, so that the same records are
+            # not pushed again; a failed push is retried on the next round
+            self.dns_update_cache[cache_fqdn] = cache_key
+        else:
+            self.dns_push_failures += 1
+        
+        return ok
 
-    def dns_push_bind(self, logid, zone, fqdn, v4_addrs = [], v6_addrs = [], cname = None):
+    def dns_push_bind(self, logid, zone, fqdn, v4_addrs = [], v6_addrs = [], cname = None, txt = None, ttl = None):
         """
         Push a set of changes to a BIND nameserver using the regular DNS protocol.
+        The name's old records are deleted and replaced with either a CNAME,
+        a TXT record, or a set of A and AAAA records. Returns True if the
+        server accepted the update.
         """
+        if ttl == None:
+            ttl = self.dns_ttl
+        
         # add a dot to make sure bind doesn't add the zone name in the end
         fqdn = fqdn + '.'
         
         update = dns.update.Update(zone, keyring=self.dns_keyring, keyalgorithm="hmac-sha256")
         update.delete(fqdn)
         if cname != None:
-            update.add(fqdn, self.dns_ttl, 'cname', cname + '.')
+            update.add(fqdn, ttl, 'cname', cname + '.')
+        elif txt != None:
+            # quote, so that the whole value becomes one character string
+            update.add(fqdn, ttl, 'txt', '"' + txt.replace('\\', '\\\\').replace('"', '\\"') + '"')
         else:
             for a in v4_addrs:
-                update.add(fqdn, self.dns_ttl, 'a', a)
+                update.add(fqdn, ttl, 'a', a)
             for a in v6_addrs:
-                update.add(fqdn, self.dns_ttl, 'aaaa', a)
+                update.add(fqdn, ttl, 'aaaa', a)
         
         try:
             response = dns.query.tcp(update, self.dns_master, timeout=10)
         except socket.error as e:
             self.log.error("DNS push [%s]: update error, cannot connect to DNS master: %r", logid, e)
-            return
+            return False
         except dns.tsig.PeerBadKey as e:
             self.log.error("DNS push [%s]: update error, DNS master does not accept our key: %r", logid, e)
-            return
+            return False
         except Exception as e:
             self.log.error("DNS push [%s]: update error: %r", logid, e)
-            return
-            
+            return False
+        
+        rcode = dns.rcode.from_flags(response.flags, response.ednsflags)
+        if rcode != dns.rcode.NOERROR:
+            self.log.error("DNS push [%s]: Sent %s: %s - update refused: %s / %s", logid, zone, fqdn,
+                dns.opcode.to_text(dns.opcode.from_flags(response.flags)), dns.rcode.to_text(rcode))
+            return False
+        
         self.log.info("DNS push [%s]: Sent %s: %s - response: %s / %s", logid, zone, fqdn,
-            dns.opcode.to_text(dns.opcode.from_flags(response.flags)),
-            dns.rcode.to_text(dns.rcode.from_flags(response.flags, response.ednsflags))
-            )
+            dns.opcode.to_text(dns.opcode.from_flags(response.flags)), dns.rcode.to_text(rcode))
+        
+        return True
     
     def poll(self):
         """
@@ -769,10 +962,54 @@ class DNSDriver:
         # figure out per-server "final score"
         merged_status = self.merge_status(servers, status_set)
         
-        # Push current DNS status to the master, if it has changed
-        self.update_dns(servers, merged_status)
+        # Push current DNS status to the master, if it has changed. With
+        # failover configured, the backup instance only does this while the
+        # primary's heartbeat is stale, and the primary writes the heartbeat
+        # after a successful round.
+        if self.failover_this_is_active():
+            self.dns_push_attempts = 0
+            self.dns_push_failures = 0
+            self.update_dns(servers, merged_status)
+            if self.failover:
+                # The heartbeat goes to the same DNS as the rotates, so it
+                # is written as long as at least half of the pushes
+                # attempted this round succeeded. With nothing to push, the
+                # round counts as successful.
+                if self.dns_push_failures * 2 > self.dns_push_attempts:
+                    self.log.warning("Failover: %d of %d DNS pushes failed this round, not writing the heartbeat",
+                        self.dns_push_failures, self.dns_push_attempts)
+                else:
+                    self.failover.update_record(update_callback=self.dns_push_txt)
         
         self.red.sendDnsStatusMessage({ 'reload': 'full' })
+
+    def failover_this_is_active(self):
+        """
+        Should this instance update DNS on this round? With failover
+        configured, the DNS update cache is cleared whenever the other
+        instance may have written the records in between: on every
+        active/passive transition, and when the previous round ran so long
+        ago that the backup may have taken over while this instance was
+        stalled. All records are then pushed again.
+        """
+        if not self.failover:
+            return True
+        
+        now = time.monotonic()
+        if self.failover_last_round != None and now - self.failover_last_round > self.failover_timeout:
+            self.log.warning("Failover: previous round was %d seconds ago, clearing the DNS update cache",
+                now - self.failover_last_round)
+            self.dns_update_cache = {}
+        self.failover_last_round = now
+        
+        active = self.failover.this_is_active()
+        if active != self.failover_was_active:
+            if self.failover_was_active != None:
+                self.log.info("Failover: state changed, clearing the DNS update cache")
+            self.dns_update_cache = {}
+            self.failover_was_active = active
+        
+        return active
     
     def loop(self):
         """
@@ -784,10 +1021,11 @@ class DNSDriver:
             time.sleep(self.poll_interval)
 
 
-cfgfile = 'poller.conf'
-if len(sys.argv) > 1:
-    cfgfile = sys.argv[1]
-
-driver = DNSDriver(cfgfile)
-driver.loop()
+if __name__ == '__main__':
+    cfgfile = 'poller.conf'
+    if len(sys.argv) > 1:
+        cfgfile = sys.argv[1]
+    
+    driver = DNSDriver(cfgfile)
+    driver.loop()
 

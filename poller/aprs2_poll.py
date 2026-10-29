@@ -46,7 +46,7 @@ javap3_re_outbound = re.compile('<TH[^>]*>Outbound Connections</TH>.*?<TR[^>]*>.
 # <TD>4,048</TD> (Looped)
 # <TD>0</TD></TR> (Queue depth (ms))
 javap3_re_outbound_line = re.compile('<TR[^>]*><TD[^>]*><A[^>]+>([^/<]+)/([^<]+)</A></TD><TD[^>]*>(.*?)</TD><TD[^>]*>(.*?)</TD><TD[^>]*>(.*?)</TD><TD[^>]*>(.*?)</TD><TD>(.*?)</TD><TD>(.*?)</TD><TD>(.*?)</TD><TD>(.*?)</TD><TD>(.*?)</TD><TD>(.*?)</TD><TD>(.*?)</TD>(.*)')
-javap3_re_uptime = re.compile('(\\d+)(\\.\d+){0,1}([dhms])(.*)')
+javap3_re_uptime = re.compile(r'(\d+)(\.\d+){0,1}([dhms])(.*)')
 javap3_re_numeric_sanitize = re.compile('[^\\d]+')
 
 re_ipv4_port = re.compile('(\\d+\\.\\d+\\.\\d+\\.\\d+):(\\d+)')
@@ -56,6 +56,16 @@ re_ipv6_port = re.compile('([0-9a-f]+:[0-9a-f]+:[0-9a-f]+:[0-9a-f]+:[0-9a-f]+:[0
 # Load on this port is tracked and scored separately.
 FULLFEED_PORT = 10152
 FULLFEED_TEST_ROTATE = 'rotate.aprs2.net'
+
+# IS2 ports, tested on the same servers: 14581 is an IS2-only client port,
+# and 10153 an IS2-only full feed port, whose load is tracked together with
+# the plaintext full feed port. 14580 and 10152 are expected to offer an
+# in-band upgrade to IS2. Only TCP listeners count: aprsc also does IS2 over
+# SCTP, but an SCTP-only port does not do much good for most clients.
+IS2_PORT = 14581
+IS2_FULLFEED_PORT = 10153
+IS2_UPGRADE_PORT = 14580
+IS2_UPGRADE_FULLFEED_PORT = FULLFEED_PORT
 
 # Maximum allowed difference between the server's wall clock and the poller's
 # clock, in seconds. IS2 requires accurate clocks on all servers.
@@ -97,6 +107,14 @@ class Poll:
         self.score = aprs2_score.Score()
         
         self.errors = []
+        
+        # (code, msg) if the server's clock could not be measured
+        self.clock_error = None
+        
+        # IS2 flags of the TCP listeners, by port number, as reported by
+        # aprsc: { port: { 'is2': any listener is IS2-only,
+        #                  'is2_upgrade': all listeners offer the upgrade } }
+        self.is2_listeners = {}
     
     def error(self, code, msg):
         """
@@ -186,6 +204,9 @@ class Poll:
         if self.score.server_version_disallowed(self.properties):
             return self.error('soft-old', 'Server software too old: needs an upgrade')
         
+        if not self.check_clock():
+            return False
+        
         # Test that the required APRS-IS services are working
         if not self.service_tests():
             return False
@@ -193,8 +214,9 @@ class Poll:
         if not self.check_uplink():
             return False
         
-        # Optional full feed port, does not affect the server's status
+        # Optional full feed port and IS2 service, do not affect the server's status
         self.fullfeed_tests()
+        self.is2_tests()
         
         return True
     
@@ -660,8 +682,13 @@ class Poll:
         
         self.properties['type'] = 'aprsc'
         
-        if not self.check_aprsc_clock(j_server, t_start, t_end):
-            return False
+        # IS2 support in this build; the listeners have their own flags
+        self.properties['is2_server'] = j_server.get('is2') == True
+        
+        # Measure the server's clock offset now, but only pass judgement on
+        # it in poll_main() after the metrics have been parsed, so that the
+        # metrics of a server with a bad clock still get reported.
+        self.measure_aprsc_clock(j_server, t_start, t_end)
         
         #
         # totals block
@@ -709,11 +736,18 @@ class Poll:
             m = l.get('clients_max')
             if u == None or m == None:
                 return self.error('web-parse-fail', 'aprsc status.json listener does not specify number of clients')
-            l_load = float(u) / float(min(self.client_cap, m)) * 100.0
+            # a clients_max <= 0 means unlimited, and then our cap applies
+            cap = min(self.client_cap, m) if m > 0 else self.client_cap
+            l_load = float(u) / float(cap) * 100.0
             
             self.log.debug("%s: listener %r %d/%d load %.1f %%", self.id, addr, u, m, l_load)
             
-            if addr and addr.rsplit(':', 1)[-1] == str(FULLFEED_PORT):
+            port = addr.rsplit(':', 1)[-1] if addr else None
+            
+            if proto == 'tcp' and port:
+                self.note_is2_listener(port, l.get('is2') == True, l.get('is2_upgrade') == True)
+            
+            if port in (str(FULLFEED_PORT), str(IS2_FULLFEED_PORT)):
                 ff_listeners.append((u, m))
                 continue
             
@@ -738,16 +772,32 @@ class Poll:
                     'up': u.get('since_connect'),
                     'rx_last': u.get('since_last_read'),
                     'rx_packets': u.get('pkts_rx'),
+                    # "is2" when the uplink runs the IS2 protocol
+                    'link': u.get('link'),
                 })
             self.properties['uplinks'] = upl
         
         return True
         
+    def note_is2_listener(self, port, is2, is2_upgrade):
+        """
+        Record the IS2 flags of a TCP listener on the given port (string),
+        for is2_tests(). A port is IS2-only if any of its listeners is, and
+        offers the upgrade only if all of its listeners do.
+        """
+        f = self.is2_listeners.get(port)
+        if f == None:
+            self.is2_listeners[port] = { 'is2': is2, 'is2_upgrade': is2_upgrade }
+        else:
+            f['is2'] = f['is2'] or is2
+            f['is2_upgrade'] = f['is2_upgrade'] and is2_upgrade
+    
     def set_fullfeed_load(self, listeners):
         """
-        Store the client count and load of the full feed port, given a list of
-        (clients, clients_max) for its listeners (v4/v6). A clients_max <= 0
-        means unlimited, and then our fullfeed_client_cap applies.
+        Store the client count and load of the full feed ports (plaintext
+        and IS2), given a list of (clients, clients_max) for their
+        listeners (v4/v6). A clients_max <= 0 means unlimited, and then
+        our fullfeed_client_cap applies.
         """
         
         if not listeners:
@@ -767,11 +817,12 @@ class Poll:
         self.properties['fullfeed_clients_max'] = ff_clients_max
         self.properties['fullfeed_load'] = ff_load
     
-    def check_aprsc_clock(self, j_server, t_start=None, t_end=None):
+    def measure_aprsc_clock(self, j_server, t_start=None, t_end=None):
         """
-        Check that the server's wall clock, as reported in status.json,
-        is within CLOCK_MAX_OFFSET seconds of the poller's clock.
-        IS2 requires that all servers have accurate clocks.
+        Measure how far the server's wall clock, as reported in status.json,
+        is off from the poller's clock, and store the result in the
+        'clock_offset' property. If the server does not report a usable
+        clock, the reason is stored in self.clock_error for check_clock().
         
         The server generates the timestamp at some unknown point between
         the start of the request (t_start) and the end of the response
@@ -785,12 +836,14 @@ class Poll:
         
         time_now = j_server.get('time_now')
         if time_now == None:
-            return self.error('clock-unknown', 'aprsc status.json block "server" does not specify "time_now"')
+            self.clock_error = ('clock-unknown', 'aprsc status.json block "server" does not specify "time_now"')
+            return
         
         try:
             time_now = float(time_now)
         except (TypeError, ValueError):
-            return self.error('clock-unknown', 'aprsc status.json "time_now" is not numeric: %r' % time_now)
+            self.clock_error = ('clock-unknown', 'aprsc status.json "time_now" is not numeric: %r' % time_now)
+            return
         
         # Minimum offset the server's clock must have for it to have
         # produced this timestamp during the request window: positive if
@@ -804,6 +857,20 @@ class Poll:
         
         self.properties['clock_offset'] = round(offset, 1)
         self.log.debug("%s: server clock offset at least %.1f s (request took %.3f s)", self.id, offset, t_end - t_start)
+    
+    def check_clock(self):
+        """
+        Check that the server's wall clock, as measured while parsing the
+        status page, is within CLOCK_MAX_OFFSET seconds of the poller's
+        clock. IS2 requires that all servers have accurate clocks.
+        Software which does not report its clock passes the check.
+        """
+        if self.clock_error != None:
+            return self.error(*self.clock_error)
+        
+        offset = self.properties.get('clock_offset')
+        if offset == None:
+            return True
         
         if abs(offset) > CLOCK_MAX_OFFSET:
             return self.error('clock-offset', 'Server clock is off by %.0f seconds, must be within %d seconds (IS2 requires accurate clocks)' % (offset, CLOCK_MAX_OFFSET))
@@ -1002,6 +1069,93 @@ class Poll:
         
         self.properties['fullfeed'] = True
     
+    def is2_port_tests(self, port, prefix):
+        """
+        Connect to an IS2-only port on each address family and check that
+        the server signature comes back. Returns a list of errors.
+        """
+        t = aprsis.IS2Poll(self.log)
+        errors = []
+        
+        for ac, pfx in (('ipv4', prefix + '4'), ('ipv6', prefix + '6')):
+            if self.server.get(ac) != None:
+                [code, msg] = t.poll(self.server[ac], port, self.id, pfx)
+                if code != 'ok':
+                    errors.append([code, "%s TCP %d: %s" % (ac, port, msg)])
+        
+        return errors
+    
+    def is2_tests(self):
+        """
+        Test the optional IS2 service. Failures here are not errors for the
+        server as a whole, they only keep it out of the IS2 rotates.
+        
+        For the IS2 client rotate, the server must report IS2 support, have
+        its uplink in IS2 mode, offer the IS2 upgrade on all 14580 TCP
+        listeners, and have an IS2-only TCP port 14581 which answers with a
+        server signature on all address families. Sets the 'is2' property on success, and
+        'is2_errors' otherwise.
+        
+        For the IS2 full feed rotate, the full feed port must additionally
+        have passed fullfeed_tests(), offer the upgrade on 10152 over TCP, and
+        have an IS2-only TCP full feed port 10153 which answers. Sets 'fullfeed_is2' on
+        success, and 'fullfeed_is2_errors' otherwise.
+        """
+        
+        if FULLFEED_TEST_ROTATE not in self.server.get('member', []):
+            return
+        
+        if not self.properties.get('is2_server'):
+            # javAPRSSrvr does not report IS2 support, and aprsc might be
+            # built without it - nothing to test.
+            self.log.info("%s: Server does not report IS2 support", self.id)
+            self.properties['is2_errors'] = [['is2-server', 'Server does not report IS2 support']]
+            return
+        
+        errors = []
+        
+        ups = self.properties.get('uplinks', [])
+        if len(ups) < 1 or ups[0].get('link') != 'is2':
+            errors.append(['is2-uplink', 'Uplink is not in IS2 mode'])
+        
+        if not self.is2_listeners.get(str(IS2_UPGRADE_PORT), {}).get('is2_upgrade'):
+            errors.append(['is2-upgrade', 'Port %d TCP listeners do not offer IS2 upgrade' % IS2_UPGRADE_PORT])
+        
+        if not self.is2_listeners.get(str(IS2_PORT), {}).get('is2'):
+            errors.append(['is2-port', 'No IS2 TCP listener on port %d' % IS2_PORT])
+        else:
+            errors += self.is2_port_tests(IS2_PORT, 'IS2')
+        
+        if errors:
+            self.properties['is2_errors'] = errors
+            self.log.info("%s: IS2 not OK: %r", self.id, errors)
+            return
+        
+        self.properties['is2'] = True
+        self.log.info("%s: IS2 OK", self.id)
+        
+        # The IS2 full feed rotate also requires a working plaintext full feed port
+        if not self.properties.get('fullfeed'):
+            return
+        
+        errors = []
+        
+        if not self.is2_listeners.get(str(IS2_UPGRADE_FULLFEED_PORT), {}).get('is2_upgrade'):
+            errors.append(['is2-upgrade', 'Port %d TCP listeners do not offer IS2 upgrade' % IS2_UPGRADE_FULLFEED_PORT])
+        
+        if not self.is2_listeners.get(str(IS2_FULLFEED_PORT), {}).get('is2'):
+            errors.append(['is2-port', 'No IS2 TCP listener on port %d' % IS2_FULLFEED_PORT])
+        else:
+            errors += self.is2_port_tests(IS2_FULLFEED_PORT, 'FFIS2')
+        
+        if errors:
+            self.properties['fullfeed_is2_errors'] = errors
+            self.log.info("%s: Full feed IS2 not OK: %r", self.id, errors)
+            return
+        
+        self.properties['fullfeed_is2'] = True
+        self.log.info("%s: Full feed IS2 OK", self.id)
+    
     def ping(self):
         lines = Popen(["ping", "-i", "1", "-w", "30", "-n", self.server['ipv4']],
             stdout=PIPE, stderr=STDOUT).communicate()[0].decode('UTF-8').split("\n")
@@ -1010,7 +1164,7 @@ class Poll:
             self.log.error("Ping %s failed: %s", self.server['ipv4'], ",".join(lines))
             return False
         
-        m = re.search(", (\d+)% packet loss,", lines[-3])
+        m = re.search(r", (\d+)% packet loss,", lines[-3])
         if not m:
             self.log.error("Ping %s failed: %s", self.server['ipv4'], ",".join(lines))
             return False
@@ -1021,7 +1175,7 @@ class Poll:
         stats = lines[-2]
         
         # min/avg/max/mdev = 40.864/41.011/41.150/0.106 ms
-        m = re.search(" = \d+\.\d+/(\d+\.\d+)/(\d+\.\d+)/", stats)
+        m = re.search(r" = \d+\.\d+/(\d+\.\d+)/(\d+\.\d+)/", stats)
         if m:
             rtt_avg = float(m.group(1))
             rtt_max = float(m.group(2))

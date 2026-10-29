@@ -1,0 +1,9 @@
+# Python packages used by the poller and the DNS driver. On Debian and
+# Ubuntu these are also available as python3-dnspython, python3-redis,
+# python3-lxml and python3-requests; the cloudflare client has to come
+# from pip, and must be the 2.x API (the CloudFlare module).
+dnspython>=2.0
+redis>=3.0
+lxml
+requests
+cloudflare>=2.8,<3

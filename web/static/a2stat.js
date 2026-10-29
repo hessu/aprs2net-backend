@@ -217,6 +217,21 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 		fetchLog(s.config.id);
 	}
 	
+	/* After a server's data has been replaced with a fresh object
+	 * (on an incremental update or a full reload), point the
+	 * detail panel at the new object so that all shown details
+	 * get updated, and refresh the poller log. */
+	var update_shown_server = function(srvr) {
+		if (!$scope.shownServer || !$scope.shownServer.config)
+			return;
+		var id = srvr['config']['id'];
+		if (id != $scope.shownServer.config.id)
+			return;
+		$scope.shownServer = srvr;
+		//console.log("  shown server updated, fetching log");
+		fetchLog(id);
+	};
+	
 	var initial_load = 1;
 	var setup_columns = function(cfg) {
 		var cols = [
@@ -295,14 +310,17 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 					var id = srvr['config']['id'];
 					//console.log("  server " + id);
 					var idx = servermap[id];
-					if (idx) {
+					if (idx !== undefined) {
+						/* rotate membership flags are only set on
+						 * a full load, carry them over to the new object */
+						var old = groups[groupmap[id]][groupidmap[id]];
+						if (old) {
+							srvr['rotate'] = old['rotate'];
+							srvr['rotate_reg'] = old['rotate_reg'];
+						}
 						groups[groupmap[id]][groupidmap[id]] = srvr;
 						//console.log("   added: " + JSON.stringify(srvr));
-						if ($scope.shownServer && id == $scope.shownServer.config.id) {
-							$scope.shownServer = srvr;
-							//console.log("  shown server, fetching log");
-							fetchLog(id);
-						}
+						update_shown_server(srvr);
 					} else {
 						// TODO: add new server
 					}
@@ -366,6 +384,16 @@ app.controller('a2stat', [ '$scope', '$http', function($scope, $http) {
 		$scope.groups = groups;
 		$scope.rotates = d['rotates'];
 		$scope.servers = servers;
+		
+		/* the detail panel may be showing a server object from the
+		 * previous load - replace it with the fresh one */
+		if ($scope.shownServer && $scope.shownServer.config) {
+			var shown_id = $scope.shownServer.config.id;
+			if (servermap[shown_id] !== undefined)
+				update_shown_server(servers[servermap[shown_id]]);
+			else
+				$scope.shownServer = 0;
+		}
 		if (rotatestat) {
 			$scope.rotatestat = rotatestat;
 			

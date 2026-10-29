@@ -236,10 +236,11 @@ class Poller:
             time.sleep(1)
 
 
-cfgfile = 'poller.conf'
-if len(sys.argv) > 1:
-    cfgfile = sys.argv[1]
-
-poller = Poller(cfgfile)
-poller.loop()
+if __name__ == '__main__':
+    cfgfile = 'poller.conf'
+    if len(sys.argv) > 1:
+        cfgfile = sys.argv[1]
+    
+    poller = Poller(cfgfile)
+    poller.loop()
 
