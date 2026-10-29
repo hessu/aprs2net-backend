@@ -84,10 +84,13 @@ supervisord, which keeps the poller and web app processes running, logs in
 Tests
 --------
 
-The DNS driver has a test suite under poller/tests, run with pytest. It
-covers the primary/backup failover state machine, the BIND and cloudflare
-record push paths, and the driver's polling round. No network, redis or
-nameserver is needed.
+The poller and the DNS driver have a test suite under poller/tests, run
+with pytest. It covers the status page parsers for aprsc and javAPRSSrvr,
+the scoring, the APRS-IS and IS2 port probes, the uplink and IS2 checks,
+the portal configuration processing, the poller's result handling, the
+primary/backup failover state machine, the BIND and cloudflare record push
+paths, and the DNS driver's polling round. No network, redis or nameserver
+is needed.
 
     apt-get install python3-pytest
     cd poller && python3 -m pytest tests

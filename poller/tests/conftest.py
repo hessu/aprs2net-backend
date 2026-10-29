@@ -1,8 +1,9 @@
 """
-Shared fixtures for the DNS driver tests.
+Shared fixtures for the DNS driver and poller tests.
 
-The driver lives in aprs2net-dns.py, which is not an importable module
-name, so it is loaded from its path. A DNSDriver is built without running
+The driver and the poller live in aprs2net-dns.py and aprs2net-poller.py,
+which are not importable module names, so they are loaded from their
+paths. A DNSDriver is built without running
 its constructor, which would need a config file, redis and the network,
 and only the attributes the tests exercise are set.
 """
@@ -33,6 +34,18 @@ def load_driver_module():
 @pytest.fixture(scope='session')
 def driver_module():
     return load_driver_module()
+
+
+def load_poller_module():
+    spec = importlib.util.spec_from_file_location('aprs2net_poller', os.path.join(POLLER_DIR, 'aprs2net-poller.py'))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+@pytest.fixture(scope='session')
+def poller_module():
+    return load_poller_module()
 
 
 class FakeResponse:

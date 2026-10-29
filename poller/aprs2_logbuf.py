@@ -50,7 +50,7 @@ class PollingLog:
         self.log.error(msg, *args, **kwargs)
     
     def exception(self, msg, *args, **kwargs):
-        self.do_append(logging.EXCEPTION, msg, *args, **kwargs)
+        self.do_append(logging.ERROR, msg, *args, **kwargs)
         self.log.exception(msg, *args, **kwargs)
     
     def critical(self, msg, *args, **kwargs):

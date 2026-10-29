@@ -46,7 +46,7 @@ javap3_re_outbound = re.compile('<TH[^>]*>Outbound Connections</TH>.*?<TR[^>]*>.
 # <TD>4,048</TD> (Looped)
 # <TD>0</TD></TR> (Queue depth (ms))
 javap3_re_outbound_line = re.compile('<TR[^>]*><TD[^>]*><A[^>]+>([^/<]+)/([^<]+)</A></TD><TD[^>]*>(.*?)</TD><TD[^>]*>(.*?)</TD><TD[^>]*>(.*?)</TD><TD[^>]*>(.*?)</TD><TD>(.*?)</TD><TD>(.*?)</TD><TD>(.*?)</TD><TD>(.*?)</TD><TD>(.*?)</TD><TD>(.*?)</TD><TD>(.*?)</TD>(.*)')
-javap3_re_uptime = re.compile('(\\d+)(\\.\d+){0,1}([dhms])(.*)')
+javap3_re_uptime = re.compile(r'(\d+)(\.\d+){0,1}([dhms])(.*)')
 javap3_re_numeric_sanitize = re.compile('[^\\d]+')
 
 re_ipv4_port = re.compile('(\\d+\\.\\d+\\.\\d+\\.\\d+):(\\d+)')
@@ -736,7 +736,9 @@ class Poll:
             m = l.get('clients_max')
             if u == None or m == None:
                 return self.error('web-parse-fail', 'aprsc status.json listener does not specify number of clients')
-            l_load = float(u) / float(min(self.client_cap, m)) * 100.0
+            # a clients_max <= 0 means unlimited, and then our cap applies
+            cap = min(self.client_cap, m) if m > 0 else self.client_cap
+            l_load = float(u) / float(cap) * 100.0
             
             self.log.debug("%s: listener %r %d/%d load %.1f %%", self.id, addr, u, m, l_load)
             
@@ -1162,7 +1164,7 @@ class Poll:
             self.log.error("Ping %s failed: %s", self.server['ipv4'], ",".join(lines))
             return False
         
-        m = re.search(", (\d+)% packet loss,", lines[-3])
+        m = re.search(r", (\d+)% packet loss,", lines[-3])
         if not m:
             self.log.error("Ping %s failed: %s", self.server['ipv4'], ",".join(lines))
             return False
@@ -1173,7 +1175,7 @@ class Poll:
         stats = lines[-2]
         
         # min/avg/max/mdev = 40.864/41.011/41.150/0.106 ms
-        m = re.search(" = \d+\.\d+/(\d+\.\d+)/(\d+\.\d+)/", stats)
+        m = re.search(r" = \d+\.\d+/(\d+\.\d+)/(\d+\.\d+)/", stats)
         if m:
             rtt_avg = float(m.group(1))
             rtt_max = float(m.group(2))
