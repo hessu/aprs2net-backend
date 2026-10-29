@@ -79,3 +79,15 @@ poller. /var/log/nginx contains logs of the nginx web server.
 supervisord, which keeps the poller and web app processes running, logs in
 /var/log/supervisor.
 
+
+
+Tests
+--------
+
+The DNS driver has a test suite under poller/tests, run with pytest. It
+covers the primary/backup failover state machine, the BIND and cloudflare
+record push paths, and the driver's polling round. No network, redis or
+nameserver is needed.
+
+    apt-get install python3-pytest
+    cd poller && python3 -m pytest tests

@@ -826,7 +826,7 @@ class DNSDriver:
         zone = self.dns_pick_zone(fqdn)
         if zone == None:
             self.log.info("DNS push [%s]: %s is not in a managed zone, not updating", logid, fqdn)
-            return
+            return True
         
         zone, fqdn = self.dns_apply_zone_override(zone, fqdn)
         self.log.info("DNS pushing [%s]: %s: TXT %s", logid, fqdn, value)
@@ -1021,10 +1021,11 @@ class DNSDriver:
             time.sleep(self.poll_interval)
 
 
-cfgfile = 'poller.conf'
-if len(sys.argv) > 1:
-    cfgfile = sys.argv[1]
-
-driver = DNSDriver(cfgfile)
-driver.loop()
+if __name__ == '__main__':
+    cfgfile = 'poller.conf'
+    if len(sys.argv) > 1:
+        cfgfile = sys.argv[1]
+    
+    driver = DNSDriver(cfgfile)
+    driver.loop()
 
