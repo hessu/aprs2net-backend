@@ -4,7 +4,31 @@ Tests for the server scoring in aprs2_score.py.
 
 import pytest
 
-from aprs2_score import Score, dur_str
+from aprs2_score import Score, dur_str, version_key, version_older
+
+
+@pytest.mark.parametrize('older,newer', [
+    ('2.1.10', '2.1.11'),
+    ('2.1.9', '2.1.10'),
+    ('2.0.14', '2.1.0'),
+    ('1.9', '2.0'),
+    ('2.1.11', '2.1.11.1'),
+    ('2.1.11', '2.1.11-g6099cb1'),      # a git build is newer than its base release
+    ('2.1.10-g6099cb1', '2.1.11'),
+    ('3.15b08', '3.15b09'),
+    ('3.15b08', '3.16'),
+    ('4.3.0b01', '4.3.0b02'),
+    ('2.1.11.1', '2.1.11b'),            # a number sorts before a word, without raising
+])
+def test_version_ordering(older, newer):
+    assert version_older(older, newer)
+    assert not version_older(newer, older)
+    assert not version_older(older, older)
+
+
+def test_version_key():
+    assert version_key('2.1.11-g6099cb1') == ((0, 2), (0, 1), (0, 11), (1, '-'), (1, 'g'), (0, 6099), (1, 'cb'), (0, 1))
+    assert version_key(2.1) == ((0, 2), (0, 1))
 
 
 @pytest.mark.parametrize('seconds,expected', [

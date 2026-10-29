@@ -1,5 +1,33 @@
 
-from distutils.version import LooseVersion
+import re
+
+# Splits a version string into its numeric, alphabetic and other parts
+version_component_re = re.compile(r'(\d+|[a-zA-Z]+|\.)')
+
+def version_key(vstring):
+    """
+    Turn a version string into a tuple which sorts the way the old
+    distutils LooseVersion did: numeric components compare as numbers,
+    others as strings, and a longer version with the same prefix is newer,
+    so "2.1.11-g6099cb1" > "2.1.11" > "2.1.10". Unlike LooseVersion, a
+    number and a word in the same position compare without an exception,
+    the number sorting first.
+    """
+    key = []
+    for c in version_component_re.split(str(vstring)):
+        if c == '' or c == '.':
+            continue
+        if c.isdigit():
+            key.append((0, int(c)))
+        else:
+            key.append((1, c))
+    return tuple(key)
+
+def version_older(a, b):
+    """
+    Is version a older than version b?
+    """
+    return version_key(a) < version_key(b)
 
 def dur_str(i):
     s = ''
@@ -177,7 +205,7 @@ class Score:
         if server_sw and server_ver:
             reqs = self.version_penalty.get(server_sw, {})
             for req_ver in reqs:
-               if LooseVersion(server_ver) < LooseVersion(req_ver):
+               if version_older(server_ver, req_ver):
                    penalty = reqs.get(req_ver, 1)
                    if penalty is not None:
                        self.score_add('version', penalty, server_ver)
@@ -221,7 +249,7 @@ class Score:
         if server_sw and server_ver:
             reqs = self.version_penalty.get(server_sw, {})
             for req_ver in reqs:
-               if LooseVersion(server_ver) < LooseVersion(req_ver):
+               if version_older(server_ver, req_ver):
                    if reqs.get(req_ver, 1) == None:
                        return True
 
