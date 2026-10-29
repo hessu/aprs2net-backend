@@ -48,6 +48,13 @@ DEFAULT_CONF = {
     # before load balancing gets to react.
     'fullfeed_min_clients': '200',
     
+    # Rotate of master rotate members which serve IS2 clients: IS2 uplink,
+    # IS2 upgrade on 14580 and an IS2-only port 14581. Empty to disable.
+    'is2_rotate': 'is2.aprs2.net',
+    # Rotate of full feed rotate members which also serve IS2 full feed
+    # clients: IS2 upgrade on 10152 and an IS2-only port 10153. Empty to disable.
+    'fullfeed_is2_rotate': 'full-feed-is2.aprs2.net',
+    
     'dns_master': '',
     'dns_zones': '',
     'dns_tsig_key': '',
@@ -87,6 +94,10 @@ class DNSDriver:
         self.unmanaged_rotates = self.config.get(CONFIG_SECTION, 'unmanaged_rotates').split(' ')
         self.fullfeed_rotate = self.config.get(CONFIG_SECTION, 'fullfeed_rotate')
         self.fullfeed_min_clients = self.config.getint(CONFIG_SECTION, 'fullfeed_min_clients')
+        self.is2_rotate = self.config.get(CONFIG_SECTION, 'is2_rotate')
+        self.fullfeed_is2_rotate = self.config.get(CONFIG_SECTION, 'fullfeed_is2_rotate')
+        # rotates derived from the master rotate's members by the poll results
+        self.derived_rotates = [r for r in (self.fullfeed_rotate, self.is2_rotate, self.fullfeed_is2_rotate) if r]
         self.pollers = self.config.get(CONFIG_SECTION, 'pollers').split(' ')
         self.max_test_result_age = self.config.getint(CONFIG_SECTION, 'max_test_result_age')
         self.min_polled_servers = self.config.getint(CONFIG_SECTION, 'min_polled_servers')
@@ -116,7 +127,9 @@ class DNSDriver:
             'site_descr': self.config.get(CONFIG_SECTION, 'site_descr'),
             'master': 1,
             'master_rotate': self.master_rotate,
-            'fullfeed_rotate': self.fullfeed_rotate
+            'fullfeed_rotate': self.fullfeed_rotate,
+            'is2_rotate': self.is2_rotate,
+            'fullfeed_is2_rotate': self.fullfeed_is2_rotate
         }
         
         # redis client
@@ -247,6 +260,8 @@ class DNSDriver:
             ok_count = 0
             scores = []
             fullfeed_scores = []
+            is2_count = 0
+            fullfeed_is2_count = 0
             errors = {}
             score_sum = 0.0
             latest_ok = None
@@ -292,6 +307,11 @@ class DNSDriver:
                 
                 if props and props.get('fullfeed') and props.get('fullfeed_score') != None:
                     fullfeed_scores.append(props['fullfeed_score'])
+                
+                if props and props.get('is2'):
+                    is2_count += 1
+                if props and props.get('fullfeed_is2'):
+                    fullfeed_is2_count += 1
                 
                 e = stat.get('errors', [])
                 for k, v in e:
@@ -387,6 +407,23 @@ class DNSDriver:
                 if m.get('props'):
                     m['props'].pop('fullfeed_score', None)
             
+            # IS2: the IS2 port needs to work from a majority of pollers, too.
+            # The IS2 rotate uses the server's main score, the IS2 full feed
+            # rotate the full feed score. The merged verdicts replace the
+            # latest poller's own in the props shown on the web UI.
+            if status == 'ok' and float(is2_count) / len(status_set[id]) > 0.48:
+                m['is2_status'] = 'ok'
+            else:
+                m['is2_status'] = 'fail'
+            if m['is2_status'] == 'ok' and m['fullfeed_status'] == 'ok' \
+                    and float(fullfeed_is2_count) / len(status_set[id]) > 0.48:
+                m['fullfeed_is2_status'] = 'ok'
+            else:
+                m['fullfeed_is2_status'] = 'fail'
+            if m.get('props'):
+                m['props']['is2'] = m['is2_status'] == 'ok'
+                m['props']['fullfeed_is2'] = m['fullfeed_is2_status'] == 'ok'
+            
             # store state in local database
             #self.log.debug("merged status for %s: %r", id, m)
             self.red.setServerStatus(id, m)
@@ -420,12 +457,24 @@ class DNSDriver:
         participating_servers = {}
         
         for d in rotates:
-            if d in self.unmanaged_rotates or d == self.fullfeed_rotate:
+            if d in self.unmanaged_rotates or d in self.derived_rotates:
                 continue
             self.update_dns_rotate(d, rotates[d], merged_status, servers, participating_servers)
         
         if self.fullfeed_rotate:
-            self.update_dns_fullfeed(rotates, merged_status, servers, participating_servers)
+            self.update_dns_derived(self.fullfeed_rotate, 'full feed', self.fullfeed_ok,
+                'fullfeed_score', 'fullfeed_clients',
+                rotates, merged_status, servers, participating_servers)
+        
+        if self.is2_rotate:
+            self.update_dns_derived(self.is2_rotate, 'IS2', self.is2_ok,
+                'score', 'clients',
+                rotates, merged_status, servers, participating_servers)
+        
+        if self.fullfeed_is2_rotate:
+            self.update_dns_derived(self.fullfeed_is2_rotate, 'IS2 full feed', self.fullfeed_is2_ok,
+                'fullfeed_score', 'fullfeed_clients',
+                rotates, merged_status, servers, participating_servers)
         
         # Push the addresses of individual servers
         self.update_dns_hosts(servers, merged_status)
@@ -486,45 +535,66 @@ class DNSDriver:
                 status, servers, participating_servers):
             self.store_rotate_stats(domain, members_ok, members_not_deleted, status)
     
-    def update_dns_fullfeed(self, rotates, status, servers, participating_servers):
+    def fullfeed_ok(self, i, status):
         """
-        Update the full feed rotate: servers which are eligible for the
-        master rotate, and have a working full feed port which is not too full.
-        Ordered by the separate full feed port score.
+        Is the server eligible for the full feed rotate: a working full feed
+        port, large enough, and not too full.
         """
-        domain = self.fullfeed_rotate
-        self.log.info("Processing full feed rotate %s ...", domain)
+        st = status.get(i)
+        props = st.get('props', {})
+        if st.get('fullfeed_status') != 'ok' or st.get('fullfeed_score') == None:
+            return False
+        if props.get('fullfeed_clients_max', 0) < self.fullfeed_min_clients:
+            self.log.info("%s: full feed port accepts %d clients, minimum %d - skipping",
+                i, props.get('fullfeed_clients_max', 0), self.fullfeed_min_clients)
+            return False
+        return props.get('fullfeed_load', 100) <= 80
+    
+    def is2_ok(self, i, status):
+        """
+        Is the server eligible for the IS2 rotate: the pollers found it
+        serving IS2 clients. The IS2 clients use the ordinary client ports,
+        so the server's main load limits apply as for the master rotate.
+        """
+        return status.get(i).get('is2_status') == 'ok'
+    
+    def fullfeed_is2_ok(self, i, status):
+        """
+        Is the server eligible for the IS2 full feed rotate: eligible for
+        the full feed rotate, and the pollers found it serving IS2 full feed
+        clients.
+        """
+        return status.get(i).get('fullfeed_is2_status') == 'ok' and self.fullfeed_ok(i, status)
+    
+    def update_dns_derived(self, domain, descr, eligible, score_key, clients_key,
+            rotates, status, servers, participating_servers):
+        """
+        Update a rotate derived from the master rotate: the servers which are
+        eligible for the master rotate, and for which eligible(id, status)
+        is True. Ordered by the score in score_key. The rotate's client
+        count statistic is summed from clients_key.
+        """
+        self.log.info("Processing %s rotate %s ...", descr, domain)
         
         master_conf = rotates.get(self.master_rotate)
         if not master_conf:
-            self.log.error("Master rotate %s not configured, cannot set up full feed rotate %s", self.master_rotate, domain)
+            self.log.error("Master rotate %s not configured, cannot set up %s rotate %s", self.master_rotate, descr, domain)
             return
         
         members_not_deleted, members_ok, members_ok_v4, members_ok_v6 = \
             self.rotate_eligible(self.master_rotate, master_conf.get('members'), status, servers)
         
-        def fullfeed_ok(i):
-            st = status.get(i)
-            props = st.get('props', {})
-            if st.get('fullfeed_status') != 'ok' or st.get('fullfeed_score') == None:
-                return False
-            if props.get('fullfeed_clients_max', 0) < self.fullfeed_min_clients:
-                self.log.info("%s: full feed port accepts %d clients, minimum %d - skipping",
-                    i, props.get('fullfeed_clients_max', 0), self.fullfeed_min_clients)
-                return False
-            return props.get('fullfeed_load', 100) <= 80
+        ok_v4 = [i for i in members_ok_v4 if eligible(i, status)]
+        ok_v6 = [i for i in members_ok_v6 if eligible(i, status)]
         
-        ff_ok_v4 = [i for i in members_ok_v4 if fullfeed_ok(i)]
-        ff_ok_v6 = [i for i in members_ok_v6 if fullfeed_ok(i)]
+        self.log.debug("%s ok ip4: %r", descr, ok_v4)
+        self.log.debug("%s ok ip6: %r", descr, ok_v6)
         
-        self.log.debug("Full feed ok ip4: %r", ff_ok_v4)
-        self.log.debug("Full feed ok ip6: %r", ff_ok_v6)
-        
-        # There is no good fallback, other servers may not have a full feed port.
-        if self.push_rotate(domain, ff_ok_v4, ff_ok_v6, 'fullfeed_score', None,
+        # There is no good fallback, other servers may not have the service.
+        if self.push_rotate(domain, ok_v4, ok_v6, score_key, None,
                 status, servers, participating_servers):
-            self.store_rotate_stats(domain, list(set(ff_ok_v4) | set(ff_ok_v6)),
-                list(set(members_ok_v4) | set(members_ok_v6)), status, clients_key='fullfeed_clients')
+            self.store_rotate_stats(domain, list(set(ok_v4) | set(ok_v6)),
+                list(set(members_ok_v4) | set(members_ok_v6)), status, clients_key=clients_key)
     
     def push_rotate(self, domain, members_ok_v4, members_ok_v6, score_key, fallback_cname,
             status, servers, participating_servers):
