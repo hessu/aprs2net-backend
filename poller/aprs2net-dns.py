@@ -152,6 +152,12 @@ class DNSDriver:
         if not self.send_metrics:
             self.log.info("Failover: backup instance, not sending metrics to graphite")
         
+        # Failover state on the previous round, and when the previous round
+        # ran, for noticing that the other instance may have changed DNS
+        # in the meantime
+        self.failover_was_active = None
+        self.failover_last_round = None
+        
         key = self.config.get(CONFIG_SECTION, 'dns_tsig_key')
         self.dns_keyring = None
         if key:
@@ -978,10 +984,32 @@ class DNSDriver:
         self.red.sendDnsStatusMessage({ 'reload': 'full' })
 
     def failover_this_is_active(self):
+        """
+        Should this instance update DNS on this round? With failover
+        configured, the DNS update cache is cleared whenever the other
+        instance may have written the records in between: on every
+        active/passive transition, and when the previous round ran so long
+        ago that the backup may have taken over while this instance was
+        stalled. All records are then pushed again.
+        """
         if not self.failover:
             return True
         
-        return self.failover.this_is_active()
+        now = time.monotonic()
+        if self.failover_last_round != None and now - self.failover_last_round > self.failover_timeout:
+            self.log.warning("Failover: previous round was %d seconds ago, clearing the DNS update cache",
+                now - self.failover_last_round)
+            self.dns_update_cache = {}
+        self.failover_last_round = now
+        
+        active = self.failover.this_is_active()
+        if active != self.failover_was_active:
+            if self.failover_was_active != None:
+                self.log.info("Failover: state changed, clearing the DNS update cache")
+            self.dns_update_cache = {}
+            self.failover_was_active = active
+        
+        return active
     
     def loop(self):
         """
