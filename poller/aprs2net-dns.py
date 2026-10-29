@@ -64,13 +64,27 @@ DEFAULT_CONF = {
     'cloudflare_zones': '',
     # Access token for the cloudflare API
     'cloudflare_token': '',
+    # For testing: write all records, on both the BIND and cloudflare
+    # backends, into this zone instead of the zone they belong to, so that
+    # rotate.aprs2.net becomes rotate.<override zone>. The failover
+    # heartbeat is looked up from the override zone, too. Empty for
+    # normal operation.
+    'dns_zone_override': '',
 
-    # DNS record used for master/secondary failover fencing
+    # Primary/backup failover between two DNS driver instances. Empty
+    # failover_record disables it and this instance always updates DNS.
+    # TXT record the primary rewrites as a heartbeat after each update round
     'failover_record': '',
-    # instance identifier of this node
+    # instance identifier of this node, written into the heartbeat
     'failover_instance_id': '',
-    # priority of this node; highest priority wins
-    'failover_priority': '1',
+    # 'primary' always updates DNS and writes the heartbeat; 'backup' only
+    # updates DNS while the heartbeat has not changed for failover_timeout
+    'failover_role': 'primary',
+    # seconds the heartbeat must stay unchanged before the backup takes over
+    'failover_timeout': '900',
+    # TTL of the heartbeat TXT record: short, so that the backup sees the
+    # heartbeat stop without waiting for resolver caches
+    'failover_record_ttl': '60',
     
     # DNS TTL
     'dns_ttl': '600',
@@ -100,6 +114,9 @@ class DNSDriver:
         self.dns_master = self.config.get(CONFIG_SECTION, 'dns_master')
         self.poll_interval = self.config.getint(CONFIG_SECTION, 'poll_interval')
         self.dns_zones = self.config.get(CONFIG_SECTION, 'dns_zones').split(' ')
+        self.dns_zone_override = self.config.get(CONFIG_SECTION, 'dns_zone_override') or None
+        if self.dns_zone_override:
+            self.log.warning("DNS zone override in effect: all records will be written in zone %s", self.dns_zone_override)
         self.master_rotate = self.config.get(CONFIG_SECTION, 'master_rotate')
         self.unmanaged_rotates = self.config.get(CONFIG_SECTION, 'unmanaged_rotates').split(' ')
         self.fullfeed_rotate = self.config.get(CONFIG_SECTION, 'fullfeed_rotate')
@@ -115,11 +132,18 @@ class DNSDriver:
 
         self.failover_instance_id = self.config.get(CONFIG_SECTION, 'failover_instance_id')
         self.failover_record = self.config.get(CONFIG_SECTION, 'failover_record')
-        self.failover_priority = self.config.getint(CONFIG_SECTION, 'failover_priority')
+        self.failover_role = self.config.get(CONFIG_SECTION, 'failover_role')
+        self.failover_timeout = self.config.getint(CONFIG_SECTION, 'failover_timeout')
+        self.failover_record_ttl = self.config.getint(CONFIG_SECTION, 'failover_record_ttl')
 
         self.failover = None
-        if self.failover_record != '' and self.failover_priority and self.failover_instance_id != '':
-            self.failover = Failover(logging.getLogger('failover'), self.failover_record, self.failover_instance_id, self.failover_priority)
+        if self.failover_record != '' and self.failover_instance_id != '':
+            # The heartbeat is looked up from where it is actually written,
+            # which the zone override may move. The write goes through
+            # dns_push_txt, which applies the override itself.
+            heartbeat_lookup = self.dns_apply_zone_override(self.dns_pick_zone(self.failover_record), self.failover_record)[1]
+            self.failover = Failover(logging.getLogger('failover'), heartbeat_lookup,
+                self.failover_instance_id, self.failover_role, self.failover_timeout)
         
         key = self.config.get(CONFIG_SECTION, 'dns_tsig_key')
         self.dns_keyring = None
@@ -761,22 +785,41 @@ class DNSDriver:
                 return z
         
         return None
+    
+    def dns_apply_zone_override(self, zone, fqdn):
+        """
+        Apply the testing zone override, if configured: return the zone to
+        update and the FQDN within it. Without an override, or if the FQDN
+        is not in a managed zone, both are returned as they are.
+        """
+        if not self.dns_zone_override or zone == None:
+            return zone, fqdn
+        
+        name = fqdn[:-(len(zone) + 1)]
+        return self.dns_zone_override, name + '.' + self.dns_zone_override
 
     def dns_push_txt(self, fqdn, value):
-        self.log.info("Pushing failover TXT: %s: %s", fqdn, value)
-
+        """
+        Push a single TXT record, replacing whatever the name had before.
+        Used for the failover heartbeat, so this is not deduplicated through
+        the update cache: the value changes on every round.
+        """
+        logid = 'heartbeat'
+        
         # look up the zone file to update
         zone = self.dns_pick_zone(fqdn)
         if zone == None:
-            self.log.info("DNS push txt: %s is not in a managed zone, not updating", fqdn)
+            self.log.info("DNS push [%s]: %s is not in a managed zone, not updating", logid, fqdn)
             return
-
+        
+        zone, fqdn = self.dns_apply_zone_override(zone, fqdn)
+        self.log.info("DNS pushing [%s]: %s: TXT %s", logid, fqdn, value)
+        
         if self.dns_master and self.dns_keyring:
-            self.dns_push_bind(logid, zone, fqdn, [], [], None, value)
+            self.dns_push_bind(logid, zone, fqdn, txt=value, ttl=self.failover_record_ttl)
         
         if self.dns_cloudflare:
-            self.dns_cloudflare.dns_push(logid, zone, fqdn, [], [], None, value)
-
+            self.dns_cloudflare.dns_push(logid, zone, fqdn, txt=value, ttl=self.failover_record_ttl)
     
     def dns_push(self, logid, fqdn, v4_addrs = [], v6_addrs = [], cname = None):
         """
@@ -809,6 +852,7 @@ class DNSDriver:
             self.log.info("DNS push [%s]: %s is not in a managed zone, not updating", logid, fqdn)
             return
         
+        zone, fqdn = self.dns_apply_zone_override(zone, fqdn)
         self.log.info("DNS pushing [%s]: %s: %s", logid, fqdn, cache_key)
 
         if self.dns_master and self.dns_keyring:
@@ -817,22 +861,30 @@ class DNSDriver:
         if self.dns_cloudflare:
             self.dns_cloudflare.dns_push(logid, zone, fqdn, v4_addrs, v6_addrs, cname)
 
-    def dns_push_bind(self, logid, zone, fqdn, v4_addrs = [], v6_addrs = [], cname = None, txt = None):
+    def dns_push_bind(self, logid, zone, fqdn, v4_addrs = [], v6_addrs = [], cname = None, txt = None, ttl = None):
         """
         Push a set of changes to a BIND nameserver using the regular DNS protocol.
+        The name's old records are deleted and replaced with either a CNAME,
+        a TXT record, or a set of A and AAAA records.
         """
+        if ttl == None:
+            ttl = self.dns_ttl
+        
         # add a dot to make sure bind doesn't add the zone name in the end
         fqdn = fqdn + '.'
         
         update = dns.update.Update(zone, keyring=self.dns_keyring, keyalgorithm="hmac-sha256")
         update.delete(fqdn)
         if cname != None:
-            update.add(fqdn, self.dns_ttl, 'cname', cname + '.')
+            update.add(fqdn, ttl, 'cname', cname + '.')
+        elif txt != None:
+            # quote, so that the whole value becomes one character string
+            update.add(fqdn, ttl, 'txt', '"' + txt.replace('\\', '\\\\').replace('"', '\\"') + '"')
         else:
             for a in v4_addrs:
-                update.add(fqdn, self.dns_ttl, 'a', a)
+                update.add(fqdn, ttl, 'a', a)
             for a in v6_addrs:
-                update.add(fqdn, self.dns_ttl, 'aaaa', a)
+                update.add(fqdn, ttl, 'aaaa', a)
         
         try:
             response = dns.query.tcp(update, self.dns_master, timeout=10)
@@ -873,21 +925,22 @@ class DNSDriver:
         # figure out per-server "final score"
         merged_status = self.merge_status(servers, status_set)
         
-        # Push current DNS status to the master, if it has changed
+        # Push current DNS status to the master, if it has changed. With
+        # failover configured, the backup instance only does this while the
+        # primary's heartbeat is stale, and the primary writes the heartbeat
+        # after a successful round.
         if self.failover_this_is_active():
             self.update_dns(servers, merged_status)
+            if self.failover:
+                self.failover.update_record(update_callback=self.dns_push_txt)
         
         self.red.sendDnsStatusMessage({ 'reload': 'full' })
 
-    def failover_this_is_active(self):        
+    def failover_this_is_active(self):
         if not self.failover:
             return True
         
-        if not self.failover.this_is_active():
-            return False
-
-        self.failover.update_record(update_callback=self.dns_push_txt)
-        return True
+        return self.failover.this_is_active()
     
     def loop(self):
         """

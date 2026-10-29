@@ -16,9 +16,12 @@ class aprs2cf:
             'aprs2.net': 'd7c9ec1d772da32eefdb89f962788913',
         }
         
-    def dns_push(self, logid, zone, fqdn, v4_addrs = [], v6_addrs = [], cname = None, txt = []):
-        use_zone = 'aprs.is' # zone
-        zone_id = self.zone_ids[use_zone]
+    def dns_push(self, logid, zone, fqdn, v4_addrs = [], v6_addrs = [], cname = None, txt = None, ttl = None):
+        use_zone = zone
+        zone_id = self.zone_ids.get(use_zone)
+        if zone_id == None:
+            self.log.error("DNS push [%s]: no zone id known for cloudflare zone %s, not updating %s", logid, use_zone, fqdn)
+            return
         
         trim_end = '.' + zone
         if not fqdn.endswith(trim_end):
@@ -28,6 +31,8 @@ class aprs2cf:
 
         if cname and (v4_addrs or v6_addrs):
             raise ValueError("CNAME and other data")
+        if txt != None and (cname or v4_addrs or v6_addrs):
+            raise ValueError("TXT and other data")
 
         fqdn_query = name + "." + use_zone
         old_records = []
@@ -41,6 +46,7 @@ class aprs2cf:
         existing_a = {}
         existing_aaaa = {}
         existing_cname = {}
+        existing_txt = {}
         for r in old_records:
             type = r.get('type')
             if type == 'A':
@@ -49,6 +55,13 @@ class aprs2cf:
                 existing_aaaa[r["content"]] = r["id"]
             elif type == 'CNAME':
                 existing_cname[r["content"]] = r["id"]
+            elif type == 'TXT':
+                # the API may return TXT content wrapped in quotes
+                existing_txt[r["content"].strip('"')] = r["id"]
+
+        if txt != None:
+            self.dns_push_txt(zone_id, fqdn_query, name, txt, ttl, old_records, existing_txt)
+            return
 
         records_required = []
         
@@ -134,5 +147,43 @@ class aprs2cf:
             except CloudFlare.exceptions.CloudFlareAPIError as e:
                 self.log.error("Failed to delete CF DNS record %s %s: %d %s", fqdn_query, record_id, e, e)
                 
-        #zones = cf.zones.get(params={'per_page':50})
+    def dns_push_txt(self, zone_id, fqdn_query, name, txt, ttl, old_records, existing_txt):
+        """
+        Make the name hold exactly one TXT record with the given content:
+        replace one of the old records with it, or create it, and delete
+        the rest.
+        """
+        record = {'name': name, 'type': 'TXT', 'content': txt, 'comment': CF_COMMENT}
+        if ttl != None:
+            record['ttl'] = ttl
+        
+        keep_id = None
+        if txt in existing_txt:
+            keep_id = existing_txt[txt]
+            self.log.info("%s already has TXT %r", fqdn_query, txt)
+        elif old_records:
+            keep_id = old_records[0]['id']
+            self.log.info("%s: replacing id %s with TXT %r", fqdn_query, keep_id, txt)
+            try:
+                r = self.cf.zones.dns_records.put(zone_id, keep_id, data=record)
+            except CloudFlare.exceptions.CloudFlareAPIError as e:
+                self.log.error("Failed to replace record CF DNS %s with TXT: %d %s", fqdn_query, e, e)
+                return
+        else:
+            self.log.info("%s: inserting TXT %r", fqdn_query, txt)
+            try:
+                r = self.cf.zones.dns_records.post(zone_id, data=record)
+            except CloudFlare.exceptions.CloudFlareAPIError as e:
+                self.log.error("Failed to create record CF DNS %s TXT: %d %s", fqdn_query, e, e)
+            return
+        
+        for rec in old_records:
+            if rec['id'] == keep_id:
+                continue
+            self.log.info("%s: deleting %s %s %r", fqdn_query, rec['id'], rec['type'], rec['content'])
+            try:
+                r = self.cf.zones.dns_records.delete(zone_id, rec['id'])
+            except CloudFlare.exceptions.CloudFlareAPIError as e:
+                self.log.error("Failed to delete CF DNS record %s %s %s: %d %s", fqdn_query, rec['type'], rec['content'], e, e)
+
 
