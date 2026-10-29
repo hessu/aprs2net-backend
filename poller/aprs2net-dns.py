@@ -18,7 +18,7 @@ import aprs2_redis
 import aprs2_config
 import aprs2_graphite
 from aprs2_cloudflare import aprs2cf
-from failover import Failover
+from failover import Failover, ROLE_BACKUP
 
 # dnspython.org
 import dns.query
@@ -144,6 +144,13 @@ class DNSDriver:
             heartbeat_lookup = self.dns_apply_zone_override(self.dns_pick_zone(self.failover_record), self.failover_record)[1]
             self.failover = Failover(logging.getLogger('failover'), heartbeat_lookup,
                 self.failover_instance_id, self.failover_role, self.failover_timeout)
+        
+        # The backup instance never sends metrics to graphite, not even
+        # while it is covering for the primary, so that the metrics are
+        # not sent twice.
+        self.send_metrics = not (self.failover and self.failover.role == ROLE_BACKUP)
+        if not self.send_metrics:
+            self.log.info("Failover: backup instance, not sending metrics to graphite")
         
         key = self.config.get(CONFIG_SECTION, 'dns_tsig_key')
         self.dns_keyring = None
@@ -474,7 +481,7 @@ class DNSDriver:
             self.red.setServerStatus(id, m)
             
             # push statistics (through a buffer and thread) to graphite
-            if server:
+            if server and self.send_metrics:
                 graphite_sender = aprs2_graphite.GraphiteSender(self.log, "server." + server["id"])
                 graphite_sender.send('merged_ok', 1 if m.get('status') == 'ok' else 0)
                 
