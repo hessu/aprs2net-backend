@@ -97,6 +97,9 @@ class Poll:
         self.score = aprs2_score.Score()
         
         self.errors = []
+        
+        # (code, msg) if the server's clock could not be measured
+        self.clock_error = None
     
     def error(self, code, msg):
         """
@@ -185,6 +188,9 @@ class Poll:
         
         if self.score.server_version_disallowed(self.properties):
             return self.error('soft-old', 'Server software too old: needs an upgrade')
+        
+        if not self.check_clock():
+            return False
         
         # Test that the required APRS-IS services are working
         if not self.service_tests():
@@ -660,8 +666,10 @@ class Poll:
         
         self.properties['type'] = 'aprsc'
         
-        if not self.check_aprsc_clock(j_server, t_start, t_end):
-            return False
+        # Measure the server's clock offset now, but only pass judgement on
+        # it in poll_main() after the metrics have been parsed, so that the
+        # metrics of a server with a bad clock still get reported.
+        self.measure_aprsc_clock(j_server, t_start, t_end)
         
         #
         # totals block
@@ -767,11 +775,12 @@ class Poll:
         self.properties['fullfeed_clients_max'] = ff_clients_max
         self.properties['fullfeed_load'] = ff_load
     
-    def check_aprsc_clock(self, j_server, t_start=None, t_end=None):
+    def measure_aprsc_clock(self, j_server, t_start=None, t_end=None):
         """
-        Check that the server's wall clock, as reported in status.json,
-        is within CLOCK_MAX_OFFSET seconds of the poller's clock.
-        IS2 requires that all servers have accurate clocks.
+        Measure how far the server's wall clock, as reported in status.json,
+        is off from the poller's clock, and store the result in the
+        'clock_offset' property. If the server does not report a usable
+        clock, the reason is stored in self.clock_error for check_clock().
         
         The server generates the timestamp at some unknown point between
         the start of the request (t_start) and the end of the response
@@ -785,12 +794,14 @@ class Poll:
         
         time_now = j_server.get('time_now')
         if time_now == None:
-            return self.error('clock-unknown', 'aprsc status.json block "server" does not specify "time_now"')
+            self.clock_error = ('clock-unknown', 'aprsc status.json block "server" does not specify "time_now"')
+            return
         
         try:
             time_now = float(time_now)
         except (TypeError, ValueError):
-            return self.error('clock-unknown', 'aprsc status.json "time_now" is not numeric: %r' % time_now)
+            self.clock_error = ('clock-unknown', 'aprsc status.json "time_now" is not numeric: %r' % time_now)
+            return
         
         # Minimum offset the server's clock must have for it to have
         # produced this timestamp during the request window: positive if
@@ -804,6 +815,20 @@ class Poll:
         
         self.properties['clock_offset'] = round(offset, 1)
         self.log.debug("%s: server clock offset at least %.1f s (request took %.3f s)", self.id, offset, t_end - t_start)
+    
+    def check_clock(self):
+        """
+        Check that the server's wall clock, as measured while parsing the
+        status page, is within CLOCK_MAX_OFFSET seconds of the poller's
+        clock. IS2 requires that all servers have accurate clocks.
+        Software which does not report its clock passes the check.
+        """
+        if self.clock_error != None:
+            return self.error(*self.clock_error)
+        
+        offset = self.properties.get('clock_offset')
+        if offset == None:
+            return True
         
         if abs(offset) > CLOCK_MAX_OFFSET:
             return self.error('clock-offset', 'Server clock is off by %.0f seconds, must be within %d seconds (IS2 requires accurate clocks)' % (offset, CLOCK_MAX_OFFSET))
