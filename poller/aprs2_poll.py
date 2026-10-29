@@ -57,6 +57,10 @@ re_ipv6_port = re.compile('([0-9a-f]+:[0-9a-f]+:[0-9a-f]+:[0-9a-f]+:[0-9a-f]+:[0
 FULLFEED_PORT = 10152
 FULLFEED_TEST_ROTATE = 'rotate.aprs2.net'
 
+# Maximum allowed difference between the server's wall clock and the poller's
+# clock, in seconds. IS2 requires accurate clocks on all servers.
+CLOCK_MAX_OFFSET = 5
+
 def javap3_strfloat(s):
     # replace non-digits with empty strings
     s = javap3_re_numeric_sanitize.sub('', s)
@@ -627,11 +631,13 @@ class Poll:
             self.log.info("%s: JSON parsing failed: %r", self.id, e)
             return self.error('web-json-fail', 'aprsc status.json JSON parsing failed')
         
-        return self.parse_aprsc(j)
+        return self.parse_aprsc(j, t_start, t_end)
         
-    def parse_aprsc(self, j):
+    def parse_aprsc(self, j, t_start=None, t_end=None):
         """
-        Parse aprsc status JSON
+        Parse aprsc status JSON. t_start and t_end are the poller's
+        wall-clock times when the HTTP request was started and when the
+        response was fully received, used for checking the server's clock.
         """
         
         #
@@ -653,6 +659,9 @@ class Poll:
             return False
         
         self.properties['type'] = 'aprsc'
+        
+        if not self.check_aprsc_clock(j_server, t_start, t_end):
+            return False
         
         #
         # totals block
@@ -757,6 +766,49 @@ class Poll:
         self.properties['fullfeed_clients'] = ff_clients
         self.properties['fullfeed_clients_max'] = ff_clients_max
         self.properties['fullfeed_load'] = ff_load
+    
+    def check_aprsc_clock(self, j_server, t_start=None, t_end=None):
+        """
+        Check that the server's wall clock, as reported in status.json,
+        is within CLOCK_MAX_OFFSET seconds of the poller's clock.
+        IS2 requires that all servers have accurate clocks.
+        
+        The server generates the timestamp at some unknown point between
+        the start of the request (t_start) and the end of the response
+        (t_end), so the download time must not count as clock offset:
+        a timestamp anywhere within that window is considered exact.
+        """
+        if t_start == None:
+            t_start = time.time()
+        if t_end == None:
+            t_end = t_start
+        
+        time_now = j_server.get('time_now')
+        if time_now == None:
+            return self.error('clock-unknown', 'aprsc status.json block "server" does not specify "time_now"')
+        
+        try:
+            time_now = float(time_now)
+        except (TypeError, ValueError):
+            return self.error('clock-unknown', 'aprsc status.json "time_now" is not numeric: %r' % time_now)
+        
+        # Minimum offset the server's clock must have for it to have
+        # produced this timestamp during the request window: positive if
+        # ahead, negative if behind, 0 if the timestamp is within the window.
+        if time_now > t_end:
+            offset = time_now - t_end
+        elif time_now < t_start:
+            offset = time_now - t_start
+        else:
+            offset = 0.0
+        
+        self.properties['clock_offset'] = round(offset, 1)
+        self.log.debug("%s: server clock offset at least %.1f s (request took %.3f s)", self.id, offset, t_end - t_start)
+        
+        if abs(offset) > CLOCK_MAX_OFFSET:
+            return self.error('clock-offset', 'Server clock is off by %.0f seconds, must be within %d seconds (IS2 requires accurate clocks)' % (offset, CLOCK_MAX_OFFSET))
+        
+        return True
     
     def aprsc_get_keys(self, src, keys, blockid):
         """
