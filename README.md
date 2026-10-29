@@ -93,4 +93,8 @@ paths, and the DNS driver's polling round. No network, redis or nameserver
 is needed.
 
     apt-get install python3-pytest
-    cd poller && python3 -m pytest tests
+    make test
+
+The packages needed by the tests are listed in poller/requirements-test.txt
+and can also be installed with pip through "make deps-test". The suite runs
+on GitHub Actions for every push and pull request.
