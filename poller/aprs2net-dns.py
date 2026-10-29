@@ -163,6 +163,9 @@ class DNSDriver:
         
         # cache DNS state for each name, to prevent updates which do not change anything
         self.dns_update_cache = {}
+        # DNS pushes attempted and failed during the current update round
+        self.dns_push_attempts = 0
+        self.dns_push_failures = 0
         
         # config object for the web UI
         self.web_config = {
@@ -815,20 +818,24 @@ class DNSDriver:
         zone, fqdn = self.dns_apply_zone_override(zone, fqdn)
         self.log.info("DNS pushing [%s]: %s: TXT %s", logid, fqdn, value)
         
+        ok = True
         if self.dns_master and self.dns_keyring:
-            self.dns_push_bind(logid, zone, fqdn, txt=value, ttl=self.failover_record_ttl)
+            ok = self.dns_push_bind(logid, zone, fqdn, txt=value, ttl=self.failover_record_ttl) and ok
         
         if self.dns_cloudflare:
-            self.dns_cloudflare.dns_push(logid, zone, fqdn, txt=value, ttl=self.failover_record_ttl)
+            ok = self.dns_cloudflare.dns_push(logid, zone, fqdn, txt=value, ttl=self.failover_record_ttl) and ok
+        
+        return ok
     
     def dns_push(self, logid, fqdn, v4_addrs = [], v6_addrs = [], cname = None):
         """
         Push a set of A and AAAA records to the DNS, but only if they've
-        changed.
+        changed. Returns False if the push was attempted and failed on any
+        backend; a failed push is retried on the next round.
         """
         # Only push updates if DNS server is configured
         if not self.dns_zones:
-            return
+            return True
             
         # check if there are any changes, sort the addresses first so that
         # scoring order changes do not cause cache misses
@@ -842,30 +849,41 @@ class DNSDriver:
         
         if self.dns_update_cache.get(fqdn) == cache_key:
             #self.log.info("DNS push [%s]: %s - no changes", logid, fqdn)
-            return
-        
-        self.dns_update_cache[fqdn] = cache_key
+            return True
         
         # look up the zone file to update
         zone = self.dns_pick_zone(fqdn)
         if zone == None:
             self.log.info("DNS push [%s]: %s is not in a managed zone, not updating", logid, fqdn)
-            return
+            return True
         
+        cache_fqdn = fqdn
         zone, fqdn = self.dns_apply_zone_override(zone, fqdn)
         self.log.info("DNS pushing [%s]: %s: %s", logid, fqdn, cache_key)
-
+        
+        self.dns_push_attempts += 1
+        ok = True
         if self.dns_master and self.dns_keyring:
-            self.dns_push_bind(logid, zone, fqdn, v4_addrs, v6_addrs, cname)
+            ok = self.dns_push_bind(logid, zone, fqdn, v4_addrs, v6_addrs, cname) and ok
         
         if self.dns_cloudflare:
-            self.dns_cloudflare.dns_push(logid, zone, fqdn, v4_addrs, v6_addrs, cname)
+            ok = self.dns_cloudflare.dns_push(logid, zone, fqdn, v4_addrs, v6_addrs, cname) and ok
+        
+        if ok:
+            # remember what is in the DNS now, so that the same records are
+            # not pushed again; a failed push is retried on the next round
+            self.dns_update_cache[cache_fqdn] = cache_key
+        else:
+            self.dns_push_failures += 1
+        
+        return ok
 
     def dns_push_bind(self, logid, zone, fqdn, v4_addrs = [], v6_addrs = [], cname = None, txt = None, ttl = None):
         """
         Push a set of changes to a BIND nameserver using the regular DNS protocol.
         The name's old records are deleted and replaced with either a CNAME,
-        a TXT record, or a set of A and AAAA records.
+        a TXT record, or a set of A and AAAA records. Returns True if the
+        server accepted the update.
         """
         if ttl == None:
             ttl = self.dns_ttl
@@ -890,18 +908,24 @@ class DNSDriver:
             response = dns.query.tcp(update, self.dns_master, timeout=10)
         except socket.error as e:
             self.log.error("DNS push [%s]: update error, cannot connect to DNS master: %r", logid, e)
-            return
+            return False
         except dns.tsig.PeerBadKey as e:
             self.log.error("DNS push [%s]: update error, DNS master does not accept our key: %r", logid, e)
-            return
+            return False
         except Exception as e:
             self.log.error("DNS push [%s]: update error: %r", logid, e)
-            return
-            
+            return False
+        
+        rcode = dns.rcode.from_flags(response.flags, response.ednsflags)
+        if rcode != dns.rcode.NOERROR:
+            self.log.error("DNS push [%s]: Sent %s: %s - update refused: %s / %s", logid, zone, fqdn,
+                dns.opcode.to_text(dns.opcode.from_flags(response.flags)), dns.rcode.to_text(rcode))
+            return False
+        
         self.log.info("DNS push [%s]: Sent %s: %s - response: %s / %s", logid, zone, fqdn,
-            dns.opcode.to_text(dns.opcode.from_flags(response.flags)),
-            dns.rcode.to_text(dns.rcode.from_flags(response.flags, response.ednsflags))
-            )
+            dns.opcode.to_text(dns.opcode.from_flags(response.flags)), dns.rcode.to_text(rcode))
+        
+        return True
     
     def poll(self):
         """
@@ -930,9 +954,19 @@ class DNSDriver:
         # primary's heartbeat is stale, and the primary writes the heartbeat
         # after a successful round.
         if self.failover_this_is_active():
+            self.dns_push_attempts = 0
+            self.dns_push_failures = 0
             self.update_dns(servers, merged_status)
             if self.failover:
-                self.failover.update_record(update_callback=self.dns_push_txt)
+                # The heartbeat goes to the same DNS as the rotates, so it
+                # is written as long as at least half of the pushes
+                # attempted this round succeeded. With nothing to push, the
+                # round counts as successful.
+                if self.dns_push_failures * 2 > self.dns_push_attempts:
+                    self.log.warning("Failover: %d of %d DNS pushes failed this round, not writing the heartbeat",
+                        self.dns_push_failures, self.dns_push_attempts)
+                else:
+                    self.failover.update_record(update_callback=self.dns_push_txt)
         
         self.red.sendDnsStatusMessage({ 'reload': 'full' })
 
