@@ -60,7 +60,8 @@ FULLFEED_TEST_ROTATE = 'rotate.aprs2.net'
 # IS2 ports, tested on the same servers: 14581 is an IS2-only client port,
 # and 10153 an IS2-only full feed port, whose load is tracked together with
 # the plaintext full feed port. 14580 and 10152 are expected to offer an
-# in-band upgrade to IS2.
+# in-band upgrade to IS2. Only TCP listeners count: aprsc also does IS2 over
+# SCTP, but an SCTP-only port does not do much good for most clients.
 IS2_PORT = 14581
 IS2_FULLFEED_PORT = 10153
 IS2_UPGRADE_PORT = 14580
@@ -1088,14 +1089,14 @@ class Poll:
         server as a whole, they only keep it out of the IS2 rotates.
         
         For the IS2 client rotate, the server must report IS2 support, have
-        its uplink in IS2 mode, offer the IS2 upgrade on all 14580 listeners,
-        and have an IS2-only port 14581 which answers with a server signature
-        on all address families. Sets the 'is2' property on success, and
+        its uplink in IS2 mode, offer the IS2 upgrade on all 14580 TCP
+        listeners, and have an IS2-only TCP port 14581 which answers with a
+        server signature on all address families. Sets the 'is2' property on success, and
         'is2_errors' otherwise.
         
         For the IS2 full feed rotate, the full feed port must additionally
-        have passed fullfeed_tests(), offer the upgrade on 10152, and have an
-        IS2-only full feed port 10153 which answers. Sets 'fullfeed_is2' on
+        have passed fullfeed_tests(), offer the upgrade on 10152 over TCP, and
+        have an IS2-only TCP full feed port 10153 which answers. Sets 'fullfeed_is2' on
         success, and 'fullfeed_is2_errors' otherwise.
         """
         
@@ -1116,10 +1117,10 @@ class Poll:
             errors.append(['is2-uplink', 'Uplink is not in IS2 mode'])
         
         if not self.is2_listeners.get(str(IS2_UPGRADE_PORT), {}).get('is2_upgrade'):
-            errors.append(['is2-upgrade', 'Port %d listeners do not offer IS2 upgrade' % IS2_UPGRADE_PORT])
+            errors.append(['is2-upgrade', 'Port %d TCP listeners do not offer IS2 upgrade' % IS2_UPGRADE_PORT])
         
         if not self.is2_listeners.get(str(IS2_PORT), {}).get('is2'):
-            errors.append(['is2-port', 'No IS2 listener on port %d' % IS2_PORT])
+            errors.append(['is2-port', 'No IS2 TCP listener on port %d' % IS2_PORT])
         else:
             errors += self.is2_port_tests(IS2_PORT, 'IS2')
         
@@ -1138,10 +1139,10 @@ class Poll:
         errors = []
         
         if not self.is2_listeners.get(str(IS2_UPGRADE_FULLFEED_PORT), {}).get('is2_upgrade'):
-            errors.append(['is2-upgrade', 'Port %d listeners do not offer IS2 upgrade' % IS2_UPGRADE_FULLFEED_PORT])
+            errors.append(['is2-upgrade', 'Port %d TCP listeners do not offer IS2 upgrade' % IS2_UPGRADE_FULLFEED_PORT])
         
         if not self.is2_listeners.get(str(IS2_FULLFEED_PORT), {}).get('is2'):
-            errors.append(['is2-port', 'No IS2 listener on port %d' % IS2_FULLFEED_PORT])
+            errors.append(['is2-port', 'No IS2 TCP listener on port %d' % IS2_FULLFEED_PORT])
         else:
             errors += self.is2_port_tests(IS2_FULLFEED_PORT, 'FFIS2')
         
