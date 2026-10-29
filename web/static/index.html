@@ -37,6 +37,8 @@
 	<span ng-show="shownServer.status.props.score"> <span><span class='glyphicon glyphicon-stats'></span> score {{ shownServer.status.props.score | number : 1 }}</span></span>
 	<span ng-show="shownServer.status.props.fullfeed_score != null"> <span><span class='glyphicon glyphicon-stats'></span> full feed score {{ shownServer.status.props.fullfeed_score | number : 1 }}</span></span>
 	<span ng-show="shownServer.status.props.fullfeed_load != null">  full feed load {{ shownServer.status.props.fullfeed_load | number : 1 }} % ({{ shownServer.status.props.fullfeed_clients }}/{{ shownServer.status.props.fullfeed_clients_max }})</span>
+	<span ng-show="shownServer.status.props.is2">  <span class='glyphicon glyphicon-flash'></span> IS2</span>
+	<span ng-show="shownServer.status.props.fullfeed_is2">  <span class='glyphicon glyphicon-flash'></span> full feed IS2</span>
 	<span ng-show="shownServer.status.avail_30">  availability {{ shownServer.status.avail_30 | number : 3 }} %/30 days, {{ shownServer.status.avail_3 | number : 3 }} %/3 days</span></span>
 	<span ng-show="shownServer.config.out_of_service">  <a href="#" class="btn btn-warning btn-xs active warning" role="button" style="cursor: default;">Out of service</a></span>
 	<span class='pull-right'>
@@ -71,9 +73,22 @@
 		<td>{{cfg.fullfeed_rotate}}</td>
 		<td><span ng-repeat="id in rotateMem[cfg.fullfeed_rotate]" ng-class="{bold: id == shownServer.config.id}"> {{id}}</span></td>
 		</tr>
+	<tr ng-show="cfg.is2_rotate && shownServer.config.member.indexOf(cfg.master_rotate) >= 0">
+		<td>{{cfg.is2_rotate}}</td>
+		<td><span ng-repeat="id in rotateMem[cfg.is2_rotate]" ng-class="{bold: id == shownServer.config.id}"> {{id}}</span></td>
+		</tr>
+	<tr ng-show="cfg.fullfeed_is2_rotate && shownServer.config.member.indexOf(cfg.master_rotate) >= 0">
+		<td>{{cfg.fullfeed_is2_rotate}}</td>
+		<td><span ng-repeat="id in rotateMem[cfg.fullfeed_is2_rotate]" ng-class="{bold: id == shownServer.config.id}"> {{id}}</span></td>
+		</tr>
 	</table>
 	</li>
 <li class="list-group-item list-group-item-danger" ng-show="shownServer.status.errors"><div ng-repeat="e in shownServer.status.errors">[{{ e[0] }}] {{ e[1] }}</div></li>
+<li class="list-group-item text-muted" ng-show="shownServer.status.props.fullfeed_errors || shownServer.status.props.is2_errors || shownServer.status.props.fullfeed_is2_errors">
+	<div ng-repeat="e in shownServer.status.props.fullfeed_errors">full feed: [{{ e[0] }}] {{ e[1] }}</div>
+	<div ng-repeat="e in shownServer.status.props.is2_errors">IS2: [{{ e[0] }}] {{ e[1] }}</div>
+	<div ng-repeat="e in shownServer.status.props.fullfeed_is2_errors">full feed IS2: [{{ e[0] }}] {{ e[1] }}</div>
+	</li>
 <li class="list-group-item poll-log" ng-show="showLog && shownLog"><pre>{{ shownLog.log }}</pre></li>
 <li class="list-group-item" ng-show="shownServer.status.props.scorebase">
 	<img ng-src="//t2graph.aprs2.net/t2/server/{{ shownServer.config.id }}_perf.png">
