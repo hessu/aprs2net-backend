@@ -98,6 +98,7 @@ def aprsc_json(time_now=None, **server_extra):
         ],
         'uplinks': [{'username': 'T2HUB1', 'addr_rem': '10.0.0.5:20152', 'since_connect': 5000,
                      'since_last_read': 3, 'pkts_rx': 99, 'link': 'is2'}],
+        'peers': [],
     }
 
 
@@ -115,7 +116,18 @@ def test_parse_aprsc(poll):
     assert p['fullfeed_load'] == 30.0
     assert p['uplinks'] == [{'id': 'T2HUB1', 'addr_rem': '10.0.0.5:20152', 'up': 5000,
                              'rx_last': 3, 'rx_packets': 99, 'link': 'is2'}]
+    assert p['peers'] == []
     assert poll.check_properties() is True
+
+
+def test_parse_aprsc_peers(poll):
+    j = aprsc_json()
+    # aprsc cuts the port numbers out of the peer addresses
+    j['peers'] = [{'username': 'T2CORE', 'addr_rem': '10.0.0.7', 'addr_loc': '10.0.0.1',
+                   'since_connect': 7000, 'since_last_read': 1, 'pkts_rx': 42}]
+    assert poll.parse_aprsc(j) is True
+    assert poll.properties['peers'] == [{'id': 'T2CORE', 'addr_rem': '10.0.0.7', 'up': 7000,
+                                         'rx_last': 1, 'rx_packets': 42}]
 
 
 def test_parse_aprsc_is2_listener_flags(poll):
@@ -157,9 +169,11 @@ def test_parse_aprsc_without_is2_or_uplinks(poll):
     j = aprsc_json()
     del j['server']['is2']
     del j['uplinks']
+    del j['peers']
     assert poll.parse_aprsc(j) is True
     assert poll.properties['is2_server'] is False
     assert 'uplinks' not in poll.properties
+    assert 'peers' not in poll.properties
 
 
 def test_fullfeed_load_caps(poll):
@@ -390,6 +404,38 @@ def test_firenet_uplinks_not_tracked(poll):
     assert poll.check_uplink() is True
 
 
+# ---- core-peer checks ----
+
+def peer(id='T2CORE'):
+    return {'id': id, 'addr_rem': '10.0.0.7', 'up': 7000, 'rx_last': 1, 'rx_packets': 42}
+
+
+def test_peers_ok_when_none(poll):
+    assert poll.check_peers() is True
+    poll.properties['peers'] = []
+    assert poll.check_peers() is True
+
+
+def test_leaf_must_not_have_peers(poll):
+    poll.properties['peers'] = [peer()]
+    assert poll.check_peers() is False
+    assert poll.errors[0][0] == 'invalid-peer'
+
+
+@pytest.mark.parametrize('member', ['hubs.aprs2.net', 'cwop.aprs.net', 'rotate.aprs.net'])
+def test_peers_allowed_for_hub_cwop_core(poll, member):
+    poll.server['member'] = [member]
+    poll.properties['peers'] = [peer(), peer(id='T2CORE2')]
+    assert poll.check_peers() is True
+
+
+def test_peers_not_allowed_for_firenet(poll):
+    poll.server['member'] = ['firenet.aprs2.net']
+    poll.properties['peers'] = [peer()]
+    assert poll.check_peers() is False
+    assert poll.errors[0][0] == 'invalid-peer'
+
+
 # ---- service, full feed and IS2 tests, with the port probes faked ----
 
 @pytest.fixture
@@ -556,6 +602,24 @@ def test_poll_main_rejects_old_software(poll, monkeypatch):
     assert poll.poll_main() is False
     assert poll.errors[-1][0] == 'soft-old'
     assert poll.software_type_cache['T2TEST'] == 'aprsc'
+
+
+def test_poll_main_fails_leaf_with_core_peers(poll, monkeypatch, fake_probes):
+    monkeypatch.setattr(poll, 'ping', lambda: True)
+    monkeypatch.setattr(poll, 'poll_javaprssrvr3', lambda: None)
+    monkeypatch.setattr(poll, 'poll_javaprssrvr4', lambda: None)
+    monkeypatch.setattr(poll, 'check_clock', lambda: True)
+    monkeypatch.setattr(poll, 'poll_http_submit', lambda: None)
+
+    def aprsc():
+        poll.score.http_status_t = 0.1
+        j = aprsc_json()
+        j['peers'] = [{'username': 'T2CORE', 'addr_rem': '10.0.0.7', 'since_connect': 7000,
+                       'since_last_read': 1, 'pkts_rx': 42}]
+        return poll.parse_aprsc(j)
+    monkeypatch.setattr(poll, 'poll_aprsc', aprsc)
+    assert poll.poll_main() is False
+    assert poll.errors[-1][0] == 'invalid-peer'
 
 
 def test_poll_main_tries_cached_software_type_first(poll, monkeypatch):

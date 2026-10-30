@@ -71,6 +71,10 @@ IS2_UPGRADE_FULLFEED_PORT = FULLFEED_PORT
 # clock, in seconds. IS2 requires accurate clocks on all servers.
 CLOCK_MAX_OFFSET = 5
 
+# Only servers in these rotates (hubs, CWOP and core) may have aprsc
+# core-peer links configured. A T2 leaf server with peers is faulty.
+PEERS_ALLOWED_ROTATES = ('hubs.aprs2.net', 'cwop.aprs.net', 'rotate.aprs.net')
+
 def javap3_strfloat(s):
     # replace non-digits with empty strings
     s = javap3_re_numeric_sanitize.sub('', s)
@@ -212,6 +216,9 @@ class Poll:
             return False
         
         if not self.check_uplink():
+            return False
+        
+        if not self.check_peers():
             return False
         
         # Optional full feed port and IS2 service, do not affect the server's status
@@ -777,6 +784,22 @@ class Poll:
                 })
             self.properties['uplinks'] = upl
         
+        #
+        # core peers (UDP peer group links, only allowed on hub, cwop and core servers)
+        #
+        j_peers = j.get('peers')
+        if j_peers != None:
+            peers = []
+            for u in j_peers:
+                peers.append({
+                    'id': u.get('username'),
+                    'addr_rem': u.get('addr_rem'),
+                    'up': u.get('since_connect'),
+                    'rx_last': u.get('since_last_read'),
+                    'rx_packets': u.get('pkts_rx'),
+                })
+            self.properties['peers'] = peers
+        
         return True
         
     def note_is2_listener(self, port, is2, is2_upgrade):
@@ -997,6 +1020,30 @@ class Poll:
         self.log.info('Uplink: Connected to %s [%s]', upl.get('addr_rem'), upl.get('id'))
         
         return True
+    
+    def check_peers(self):
+        """
+        Check that a server does not have core-peer links configured, unless
+        it is a hub, cwop or core server. aprsc reports the peer group links
+        in the "peers" block of status.json; other server software does not
+        report them, and then there is nothing to check.
+        """
+        
+        peers = self.properties.get('peers', [])
+        
+        self.log.debug("peers: %r", peers)
+        
+        if len(peers) == 0:
+            return True
+        
+        member_of = self.server.get('member', [])
+        
+        for m in PEERS_ALLOWED_ROTATES:
+            if m in member_of:
+                self.log.debug("member of %s, core-peer links allowed", m)
+                return True
+        
+        return self.error('invalid-peer', 'Server has %d core-peer link(s) configured - only allowed for hub, CWOP and core servers' % len(peers))
     
     def service_tests(self):
         """
