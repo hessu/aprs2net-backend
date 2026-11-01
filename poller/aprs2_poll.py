@@ -75,6 +75,11 @@ CLOCK_MAX_OFFSET = 5
 # core-peer links configured. A T2 leaf server with peers is faulty.
 PEERS_ALLOWED_ROTATES = ('hubs.aprs2.net', 'cwop.aprs.net', 'rotate.aprs.net')
 
+# Core servers have no uplinks, IS2 or otherwise, so their IS2 service is
+# judged by the IS2 support of the build, the IS2-only listeners and the
+# IS2 core-peer links.
+CORE_ROTATE = 'rotate.aprs.net'
+
 def javap3_strfloat(s):
     # replace non-digits with empty strings
     s = javap3_re_numeric_sanitize.sub('', s)
@@ -797,6 +802,8 @@ class Poll:
                     'up': u.get('since_connect'),
                     'rx_last': u.get('since_last_read'),
                     'rx_packets': u.get('pkts_rx'),
+                    # "is2" when the peer link has switched to IS2
+                    'link': u.get('link'),
                 })
             self.properties['peers'] = peers
         
@@ -1147,8 +1154,14 @@ class Poll:
         have passed fullfeed_tests(), offer the upgrade on 10152 over TCP, and
         have an IS2-only TCP full feed port 10153 which answers. Sets 'fullfeed_is2' on
         success, and 'fullfeed_is2_errors' otherwise.
+
+        Core servers are checked by is2_core_tests() instead.
         """
-        
+
+        if CORE_ROTATE in self.server.get('member', []):
+            self.is2_core_tests()
+            return
+
         if FULLFEED_TEST_ROTATE not in self.server.get('member', []):
             return
         
@@ -1202,7 +1215,38 @@ class Poll:
         
         self.properties['fullfeed_is2'] = True
         self.log.info("%s: Full feed IS2 OK", self.id)
-    
+
+    def is2_core_tests(self):
+        """
+        Check the IS2 service of a core server, for display only: the server
+        must report IS2 support, have IS2-only TCP listeners on ports
+        14581 and 10153, and have at least one core-peer link in IS2 mode.
+        Core servers never have an IS2 uplink. Sets the 'is2_core' property
+        on success, and 'is2_errors' otherwise.
+        """
+
+        if not self.properties.get('is2_server'):
+            self.log.info("%s: Server does not report IS2 support", self.id)
+            self.properties['is2_errors'] = [['is2-server', 'Server does not report IS2 support']]
+            return
+
+        errors = []
+        for port in (IS2_PORT, IS2_FULLFEED_PORT):
+            if not self.is2_listeners.get(str(port), {}).get('is2'):
+                errors.append(['is2-port', 'No IS2 TCP listener on port %d' % port])
+
+        is2_peers = [p for p in self.properties.get('peers', []) if p.get('link') == 'is2']
+        if not is2_peers:
+            errors.append(['is2-peer', 'No core-peer links in IS2 mode'])
+
+        if errors:
+            self.properties['is2_errors'] = errors
+            self.log.info("%s: Core IS2 not OK: %r", self.id, errors)
+            return
+
+        self.properties['is2_core'] = True
+        self.log.info("%s: Core IS2 OK", self.id)
+
     def ping(self):
         lines = Popen(["ping", "-i", "1", "-w", "30", "-n", self.server['ipv4']],
             stdout=PIPE, stderr=STDOUT).communicate()[0].decode('UTF-8').split("\n")

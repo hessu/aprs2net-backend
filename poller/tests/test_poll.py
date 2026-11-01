@@ -127,7 +127,7 @@ def test_parse_aprsc_peers(poll):
                    'since_connect': 7000, 'since_last_read': 1, 'pkts_rx': 42}]
     assert poll.parse_aprsc(j) is True
     assert poll.properties['peers'] == [{'id': 'T2CORE', 'addr_rem': '10.0.0.7', 'up': 7000,
-                                         'rx_last': 1, 'rx_packets': 42}]
+                                         'rx_last': 1, 'rx_packets': 42, 'link': None}]
 
 
 def test_parse_aprsc_is2_listener_flags(poll):
@@ -565,6 +565,49 @@ def test_fullfeed_is2_requirements(poll, fake_probes):
     poll.is2_tests()
     assert poll.properties['is2'] is True
     assert [e[0] for e in poll.properties['fullfeed_is2_errors']] == ['is2-port']
+
+
+def core_aprsc_json():
+    # a core server: no uplinks, one plain and one IS2 core-peer link
+    j = aprsc_json()
+    j['uplinks'] = []
+    j['peers'] = [
+        {'username': 'T2CORE2', 'addr_rem': '10.0.0.7', 'since_connect': 7000,
+         'since_last_read': 1, 'pkts_rx': 42},
+        {'username': 'T2CORE3', 'addr_rem': '10.0.0.8', 'since_connect': 7000,
+         'since_last_read': 1, 'pkts_rx': 42, 'link': 'is2'},
+    ]
+    return j
+
+
+def test_is2_core_ok(poll, fake_probes):
+    poll.server['member'] = ['rotate.aprs.net']
+    poll.parse_aprsc(core_aprsc_json())
+    poll.is2_tests()
+    assert poll.properties['is2_core'] is True
+    assert 'is2' not in poll.properties
+    assert 'is2_errors' not in poll.properties
+    assert fake_probes.calls == []
+
+
+@pytest.mark.parametrize('change,codes', [
+    (lambda j: j['server'].pop('is2'), ['is2-server']),
+    (lambda j: j['listeners'].pop(2), ['is2-port']),
+    (lambda j: j['listeners'].pop(4), ['is2-port']),
+    (lambda j: [j['listeners'].pop(4), j['listeners'].pop(2)], ['is2-port', 'is2-port']),
+    (lambda j: j['peers'].pop(1), ['is2-peer']),
+    (lambda j: j.update(peers=[]), ['is2-peer']),
+    (lambda j: j.pop('peers'), ['is2-peer']),
+])
+def test_is2_core_requirements(poll, fake_probes, change, codes):
+    poll.server['member'] = ['rotate.aprs.net']
+    j = core_aprsc_json()
+    change(j)
+    poll.parse_aprsc(j)
+    poll.is2_tests()
+    assert 'is2_core' not in poll.properties
+    assert [e[0] for e in poll.properties['is2_errors']] == codes
+    assert poll.errors == []
 
 
 # ---- the whole poll ----

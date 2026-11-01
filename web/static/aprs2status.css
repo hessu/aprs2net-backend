@@ -74,3 +74,11 @@ li.poll-log pre {
 	margin: 0px;
 	background: none;
 }
+
+/* IS2 badge at the start of the Info column */
+.is2-badge {
+	font-size: 9px;
+	padding: 1px 4px;
+	margin-right: 3px;
+	cursor: default;
+}

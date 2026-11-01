@@ -39,6 +39,7 @@
 	<span ng-show="shownServer.status.props.fullfeed_load != null">  full feed load {{ shownServer.status.props.fullfeed_load | number : 1 }} % ({{ shownServer.status.props.fullfeed_clients }}/{{ shownServer.status.props.fullfeed_clients_max }})</span>
 	<span ng-show="shownServer.status.props.is2">  <span class='glyphicon glyphicon-flash'></span> IS2</span>
 	<span ng-show="shownServer.status.props.fullfeed_is2">  <span class='glyphicon glyphicon-flash'></span> full feed IS2</span>
+	<span ng-show="shownServer.status.props.is2_core">  <span class='glyphicon glyphicon-flash'></span> IS2 (core)</span>
 	<span ng-show="shownServer.status.avail_30">  availability {{ shownServer.status.avail_30 | number : 3 }} %/30 days, {{ shownServer.status.avail_3 | number : 3 }} %/3 days</span></span>
 	<span ng-show="shownServer.config.out_of_service">  <a href="#" class="btn btn-warning btn-xs active warning" role="button" style="cursor: default;">Out of service</a></span>
 	<span class='pull-right'>
@@ -119,7 +120,9 @@
 	<td ng-show="cfg.master" class="text-right">{{ s.status.c }}</td>
 	<td class="text-right">{{ s.status.props.score | number : 0 }}</td>
 	<td class="text-right">{{ s.status.avail_3 | number : 2 }} %</td>
-	<td><span ng-show="s.config.out_of_service">serviced </span><span ng-repeat="e in s.status.errors">{{ e[0] }} </span></td>
+	<td><span ng-show="s.status.props.is2 || s.status.props.is2_core" class="label label-success is2-badge"
+		title="{{ s.status.props.is2_core ? 'Core server with IS2 listeners on ports 14581 and 10153, and IS2 core-peer links' : (s.status.props.fullfeed_is2 ? 'Eligible for the IS2 and IS2 full feed rotates' : 'Eligible for the IS2 rotate') }}">IS2</span>
+		<span ng-show="s.config.out_of_service">serviced </span><span ng-repeat="e in s.status.errors">{{ e[0] }} </span></td>
 	</tr>
 </table>
 </div>
